@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import type {ViewStyle} from 'react-native';
 import {View} from 'react-native';
 import Icon from '@components/Icon';
@@ -9,6 +9,7 @@ import useOnyx from '@hooks/useOnyx';
 import useTheme from '@hooks/useTheme';
 import useThemeStyles from '@hooks/useThemeStyles';
 import {getIOUActionForTransactionID} from '@libs/ReportActionsUtils';
+import {isViolationDismissed, shouldShowViolation} from '@libs/TransactionUtils';
 import ViolationsUtils from '@libs/Violations/ViolationsUtils';
 import variables from '@styles/variables';
 import ONYXKEYS from '@src/ONYXKEYS';
@@ -40,12 +41,26 @@ function TransactionItemRowRBRWithOnyx({transaction, violations, report, contain
         canBeMissing: true,
     });
     const [policyTags] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY_TAGS}${report?.policyID}`, {canBeMissing: true});
+    const [policy] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY}${report?.policyID}`, {canBeMissing: true});
     const transactionThreadId = reportActions ? getIOUActionForTransactionID(Object.values(reportActions ?? {}), transaction.transactionID)?.childReportID : undefined;
     const [transactionThreadActions] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${transactionThreadId}`, {
         canBeMissing: true,
     });
 
-    const RBRMessages = ViolationsUtils.getRBRMessages(transaction, violations ?? [], translate, missingFieldError, Object.values(transactionThreadActions ?? {}), policyTags);
+    const filteredViolations = useMemo(
+        () =>
+            (!report ? violations ?? [] : (violations ?? []).filter((violation) => !isViolationDismissed(transaction, violation) && shouldShowViolation(report, policy, violation.name))),
+        [report, policy, transaction, violations],
+    );
+
+    const RBRMessages = ViolationsUtils.getRBRMessages(
+        transaction,
+        filteredViolations,
+        translate,
+        missingFieldError,
+        Object.values(transactionThreadActions ?? {}),
+        policyTags,
+    );
 
     return (
         RBRMessages.length > 0 && (
