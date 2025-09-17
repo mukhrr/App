@@ -4507,24 +4507,77 @@ function getUpdateMoneyRequestParams(
                 },
             });
         }
-        if (
-            violationsOnyxData &&
-            ((iouReport?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN) === CONST.REPORT.STATUS_NUM.OPEN ||
-                (hasModifiedReimbursable && iouReport?.statusNum === CONST.REPORT.STATUS_NUM.SUBMITTED))
-        ) {
-            const currentNextStep = allNextSteps[`${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`] ?? {};
-            const shouldFixViolations = Array.isArray(violationsOnyxData.value) && violationsOnyxData.value.length > 0;
-            optimisticData.push({
-                onyxMethod: Onyx.METHOD.MERGE,
-                key: `${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`,
-                value: buildNextStep(updatedMoneyRequestReport ?? iouReport ?? undefined, iouReport?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN, shouldFixViolations),
-            });
-            failureData.push({
-                onyxMethod: Onyx.METHOD.MERGE,
-                key: `${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`,
-                value: currentNextStep,
-            });
+    }
+
+    // Update search results metadata when transaction amount changes to keep Total Spend field accurate
+    if (hasModifiedAmount && transaction && updatedTransaction && hash) {
+        const oldAmount = getAmount(transaction, false);
+        const newAmount = getAmount(updatedTransaction, false);
+        const currency = getCurrency(transaction);
+        
+        // Only update if the amount actually changed
+        if (oldAmount !== newAmount) {
+            const amountDiff = newAmount - oldAmount;
+            
+            // Get current search results to update the metadata
+            const currentSnapshot = Onyx.get(`${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`);
+            if (currentSnapshot?.search) {
+                const currentTotal = currentSnapshot.search.total ?? 0;
+                const newTotal = currentTotal + amountDiff;
+
+                optimisticData.push({
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: `${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`,
+                    value: {
+                        search: {
+                            total: newTotal,
+                        },
+                        data: {
+                            [`${ONYXKEYS.COLLECTION.TRANSACTION}${transactionID}`]: {
+                                amount: newAmount,
+                                currency,
+                            },
+                        },
+                    },
+                });
+
+                // Revert the search results on failure
+                failureData.push({
+                    onyxMethod: Onyx.METHOD.MERGE,
+                    key: `${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`,
+                    value: {
+                        search: {
+                            total: currentTotal,
+                        },
+                        data: {
+                            [`${ONYXKEYS.COLLECTION.TRANSACTION}${transactionID}`]: {
+                                amount: oldAmount,
+                                currency,
+                            },
+                        },
+                    },
+                });
+            }
         }
+    }
+
+    if (
+        violationsOnyxData &&
+        ((iouReport?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN) === CONST.REPORT.STATUS_NUM.OPEN ||
+            (hasModifiedReimbursable && iouReport?.statusNum === CONST.REPORT.STATUS_NUM.SUBMITTED))
+    ) {
+        const currentNextStep = allNextSteps[`${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`] ?? {};
+        const shouldFixViolations = Array.isArray(violationsOnyxData.value) && violationsOnyxData.value.length > 0;
+        optimisticData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`,
+            value: buildNextStep(updatedMoneyRequestReport ?? iouReport ?? undefined, iouReport?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN, shouldFixViolations),
+        });
+        failureData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.NEXT_STEP}${iouReport?.reportID}`,
+            value: currentNextStep,
+        });
     }
 
     // Reset the transaction thread to its original state

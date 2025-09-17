@@ -333,6 +333,37 @@ function updateSearchResultsWithTransactionThreadReportID(hash: number, transact
     Onyx.merge(`${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`, onyxUpdate);
 }
 
+/**
+ * Updates search results metadata when transaction amounts change to keep the Total Spend field accurate
+ * This is needed because the search results metadata contains cached totals that become stale when transactions are edited offline
+ */
+function updateSearchResultsMetadataWithTransactionAmount(hash: number, transactionID: string, oldAmount: number, newAmount: number, currency: string) {
+    const amountDiff = newAmount - oldAmount;
+    
+    // Get current search results to update the metadata
+    const currentSnapshot = Onyx.get(`${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`);
+    if (!currentSnapshot?.search) {
+        return;
+    }
+
+    const currentTotal = currentSnapshot.search.total ?? 0;
+    const newTotal = currentTotal + amountDiff;
+
+    const onyxUpdate = {
+        search: {
+            total: newTotal,
+        },
+        data: {
+            [`${ONYXKEYS.COLLECTION.TRANSACTION}${transactionID}`]: {
+                amount: newAmount,
+                currency,
+            },
+        },
+    };
+    
+    Onyx.merge(`${ONYXKEYS.COLLECTION.SNAPSHOT}${hash}`, onyxUpdate);
+}
+
 function holdMoneyRequestOnSearch(hash: number, transactionIDList: string[], comment: string, allTransactions: OnyxCollection<Transaction>, allReportActions: OnyxCollection<ReportActions>) {
     const {optimisticData, finallyData} = getOnyxLoadingData(hash);
     transactionIDList.forEach((transactionID) => {
@@ -604,6 +635,7 @@ export {
     saveSearch,
     search,
     updateSearchResultsWithTransactionThreadReportID,
+    updateSearchResultsMetadataWithTransactionAmount,
     deleteMoneyRequestOnSearch,
     holdMoneyRequestOnSearch,
     unholdMoneyRequestOnSearch,
