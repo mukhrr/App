@@ -115,6 +115,11 @@ function getOnboardingInitialPath(getOnboardingInitialPathParams: GetOnboardingI
         return `/${ROUTES.TEST_DRIVE_MODAL_ROOT.route}`;
     }
 
+    // If the user has completed the guided setup flow, don't restart the onboarding
+    if (currentOnboardingValues?.hasCompletedGuidedSetupFlow) {
+        return onboardingInitialPath;
+    }
+
     if (isVsb) {
         Onyx.set(ONYXKEYS.ONBOARDING_PURPOSE_SELECTED, CONST.ONBOARDING_CHOICES.MANAGE_TEAM);
         Onyx.set(ONYXKEYS.ONBOARDING_COMPANY_SIZE, CONST.ONBOARDING_COMPANY_SIZE.MICRO);

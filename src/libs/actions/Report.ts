@@ -4328,19 +4328,11 @@ function completeOnboarding({
 
     // Only add the dismissed state of the test drive modal when the user is not redirected to oldDot,
     // because we don't want the modal to reappear when returning from oldDot.
+    // Don't set testDriveModalDismissed to false here as it causes the modal to appear twice
+    // The modal will be shown via navigation in the onboarding flow
     if (!shouldSkipTestDriveModal && !(engagementChoice === CONST.ONBOARDING_CHOICES.MANAGE_TEAM && willRedirectToOldDotFromOnboarding)) {
-        optimisticData.push({
-            onyxMethod: Onyx.METHOD.MERGE,
-            key: ONYXKEYS.NVP_ONBOARDING,
-            value: {testDriveModalDismissed: false},
-        });
-
-        successData.push({
-            onyxMethod: Onyx.METHOD.MERGE,
-            key: ONYXKEYS.NVP_ONBOARDING,
-            value: {testDriveModalDismissed: false},
-        });
-
+        // Remove the optimistic and success data that was setting testDriveModalDismissed to false
+        // This was causing the modal to appear twice
         failureData.push({
             onyxMethod: Onyx.METHOD.MERGE,
             key: ONYXKEYS.NVP_ONBOARDING,

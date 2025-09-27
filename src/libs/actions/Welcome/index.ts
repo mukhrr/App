@@ -51,7 +51,9 @@ function isOnboardingFlowCompleted({onCompleted, onNotCompleted, onCanceled}: Ha
 
         // The value `undefined` should not be used here because `testDriveModalDismissed` may not always exist in `onboarding`.
         // So we only compare it to `false` to avoid unintentionally opening the test drive modal.
-        if (onboarding?.testDriveModalDismissed === false) {
+        // However, we should also check if the user has already completed the guided setup flow
+        // to prevent showing the test drive modal multiple times
+        if (onboarding?.testDriveModalDismissed === false && !onboarding?.hasCompletedGuidedSetupFlow) {
             startOnboardingFlow({onboardingInitialPath: ROUTES.TEST_DRIVE_MODAL_ROOT.route} as GetOnboardingInitialPathParamsType);
             return;
         }

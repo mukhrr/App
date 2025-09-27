@@ -1,4 +1,4 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useRef} from 'react';
 import TestDrive from '@assets/images/test-drive.svg';
 import type {FeatureTrainingModalProps} from '@components/FeatureTrainingModal';
 import FeatureTrainingModal from '@components/FeatureTrainingModal';
@@ -38,6 +38,18 @@ function BaseTestDriveModal({
     const styles = useThemeStyles();
     const {translate} = useLocalize();
     const {shouldUseNarrowLayout} = useResponsiveLayout();
+    const hasUserInteracted = useRef(false);
+
+    // Track user interactions to prevent auto-dismissal
+    const handleConfirm = () => {
+        hasUserInteracted.current = true;
+        onConfirm?.();
+    };
+
+    const handleHelp = () => {
+        hasUserInteracted.current = true;
+        onHelp?.();
+    };
 
     useEffect(
         () => () => {
@@ -46,7 +58,11 @@ function BaseTestDriveModal({
             if (!currentRoute) {
                 return;
             }
-            setOnboardingTestDriveModalDismissed();
+            // Only auto-dismiss if the user hasn't interacted with the modal
+            // This prevents the modal from being dismissed when the user is actively using it
+            if (!hasUserInteracted.current) {
+                setOnboardingTestDriveModalDismissed();
+            }
         },
         [],
     );
@@ -60,8 +76,8 @@ function BaseTestDriveModal({
             description={description}
             helpText={translate('testDrive.modal.helpText')}
             confirmText={translate('testDrive.modal.confirmText')}
-            onHelp={onHelp}
-            onConfirm={onConfirm}
+            onHelp={handleHelp}
+            onConfirm={handleConfirm}
             modalInnerContainerStyle={styles.testDriveModalContainer(shouldUseNarrowLayout)}
             contentInnerContainerStyles={styles.gap2}
             shouldCloseOnConfirm={shouldCloseOnConfirm}
