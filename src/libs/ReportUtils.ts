@@ -11909,8 +11909,9 @@ function isWorkspaceMemberLeavingWorkspaceRoom(report: OnyxEntry<Report>, isPoli
     if (!report) {
         return false;
     }
+    // Workspace chats (policy expense chats) should be accessible to all workspace members regardless of role
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const hasAccessPolicyExpenseChat = isPolicyExpenseChat(report) && (report.isOwnPolicyExpenseChat || isPolicyAdminParam);
+    const hasAccessPolicyExpenseChat = isPolicyExpenseChat(report) && (report.isOwnPolicyExpenseChat || isPolicyAdminParam || isPolicyEmployee);
     return (report.visibility === CONST.REPORT.VISIBILITY.RESTRICTED || hasAccessPolicyExpenseChat) && isPolicyEmployee;
 }
 

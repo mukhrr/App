@@ -787,6 +787,39 @@ function buildUpdateWorkspaceMembersRoleOnyxData(policyID: string, accountIDs: n
         }
     }
 
+    // Handle workspace chat (policy expense chat) access for all workspace members
+    // Workspace chats should remain visible to all members regardless of role
+    const workspaceChats = ReportUtils.getAllPolicyReports(policyID).filter(ReportUtils.isPolicyExpenseChat);
+    workspaceChats.forEach((workspaceChat) => {
+        const failureDataParticipants: Record<number, Participant | null> = {...workspaceChat.participants};
+        const optimisticParticipants: Record<number, Participant | null> = {};
+        
+        // Ensure all workspace members have access to workspace chats
+        accountIDs.forEach((accountID) => {
+            if (!workspaceChat?.participants?.[accountID]) {
+                optimisticParticipants[accountID] = {notificationPreference: CONST.REPORT.NOTIFICATION_PREFERENCE.ALWAYS};
+                failureDataParticipants[accountID] = null;
+            }
+        });
+        
+        if (!isEmptyObject(optimisticParticipants)) {
+            optimisticData.push({
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: `${ONYXKEYS.COLLECTION.REPORT}${workspaceChat.reportID}`,
+                value: {
+                    participants: optimisticParticipants,
+                },
+            });
+            failureData.push({
+                onyxMethod: Onyx.METHOD.MERGE,
+                key: `${ONYXKEYS.COLLECTION.REPORT}${workspaceChat.reportID}`,
+                value: {
+                    participants: failureDataParticipants,
+                },
+            });
+        }
+    });
+
     return {optimisticData, successData, failureData, memberRoles};
 }
 
