@@ -787,6 +787,29 @@ function buildUpdateWorkspaceMembersRoleOnyxData(policyID: string, accountIDs: n
         }
     }
 
+    // Ensure workspace chats remain visible when role changes from Admin to Member
+    const workspaceChats = ReportUtils.getWorkspaceChats(policyID, accountIDs);
+    workspaceChats.forEach((workspaceChat) => {
+        if (!workspaceChat) {
+            return;
+        }
+        optimisticData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.REPORT}${workspaceChat.reportID}`,
+            value: {
+                stateNum: CONST.REPORT.STATE_NUM.OPEN,
+                statusNum: CONST.REPORT.STATUS_NUM.OPEN,
+            },
+        });
+        optimisticData.push({
+            onyxMethod: Onyx.METHOD.MERGE,
+            key: `${ONYXKEYS.COLLECTION.REPORT_NAME_VALUE_PAIRS}${workspaceChat.reportID}`,
+            value: {
+                private_isArchived: false,
+            },
+        });
+    });
+
     return {optimisticData, successData, failureData, memberRoles};
 }
 
