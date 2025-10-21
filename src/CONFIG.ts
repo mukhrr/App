@@ -1,9 +1,8 @@
 import HybridAppModule from '@expensify/react-native-hybrid-app';
-import {Platform} from 'react-native';
-import type {NativeConfig} from 'react-native-config';
+import { Platform } from 'react-native';
+import type { NativeConfig } from 'react-native-config';
 import Config from 'react-native-config';
 import CONST from './CONST';
-import getPlatform from './libs/getPlatform';
 import addTrailingForwardSlash from './libs/UrlUtils';
 
 // react-native-config doesn't trim whitespace on iOS for some reason so we
@@ -13,7 +12,7 @@ const get = (config: NativeConfig, key: string, defaultValue: string): string =>
 const getDefaultLegacyPartnerConfig = () => {
     // eslint-disable-next-line no-restricted-properties
     if (!HybridAppModule.isHybridApp()) {
-        return {name: '', password: ''};
+        return { name: '', password: '' };
     }
 
     if (Platform.OS === 'ios') {
@@ -41,8 +40,21 @@ const secureNgrokURL = addTrailingForwardSlash(get(Config, 'SECURE_NGROK_URL', '
 const secureExpensifyUrl = addTrailingForwardSlash(get(Config, 'SECURE_EXPENSIFY_URL', 'https://secure.expensify.com/'));
 const useNgrok = get(Config, 'USE_NGROK', 'false') === 'true';
 const useWebProxy = get(Config, 'USE_WEB_PROXY', 'true') === 'true';
-const expensifyComWithProxy = getPlatform() === 'web' && useWebProxy ? '/' : expensifyURL;
 const googleGeolocationAPIKey = get(Config, 'GCP_GEOLOCATION_API_KEY', '');
+
+const getIsUsingWebProxy = () => {
+    const getPlatform = require('./libs/getPlatform').default as () => string;
+    return getPlatform() === 'web' && useWebProxy;
+};
+
+const getExpensifyComWithProxy = () => {
+    return getIsUsingWebProxy() ? '/' : expensifyURL;
+};
+
+// Ngrok helps us avoid many of our cross-domain issues with connecting to our API
+// and is required for viewing images on mobile and for developing on android
+// To enable, set the USE_NGROK value to true in .env and update the NGROK_URL
+const getExpensifyURLRoot = () => useNgrok && ngrokURL ? ngrokURL : getExpensifyComWithProxy();
 
 // Throw errors on dev if config variables are not set correctly
 if (ENVIRONMENT === CONST.ENVIRONMENT.DEV) {
@@ -57,12 +69,7 @@ if (ENVIRONMENT === CONST.ENVIRONMENT.DEV) {
 
 const secureURLRoot = useNgrok && secureNgrokURL ? secureNgrokURL : secureExpensifyUrl;
 
-// Ngrok helps us avoid many of our cross-domain issues with connecting to our API
-// and is required for viewing images on mobile and for developing on android
-// To enable, set the USE_NGROK value to true in .env and update the NGROK_URL
-const expensifyURLRoot = useNgrok && ngrokURL ? ngrokURL : expensifyComWithProxy;
-
-export default {
+const CONFIG = {
     APP_NAME: 'NewExpensify',
     AUTH_TOKEN_EXPIRATION_TIME: 1000 * 60 * 90,
     ENVIRONMENT,
@@ -77,7 +84,9 @@ export default {
         // On both STAGING and PROD this (DEFAULT) address points to production
         // On DEV it can be configured through ENV settings and can be a proxy or ngrok address (defaults to PROD)
         // Usually you don't need to use this URL directly - prefer `ApiUtils.getApiRoot()`
-        DEFAULT_API_ROOT: expensifyURLRoot,
+        get DEFAULT_API_ROOT() {
+            return getExpensifyURLRoot();
+        },
         DEFAULT_SECURE_API_ROOT: secureURLRoot,
         STAGING_API_ROOT: stagingExpensifyURL,
         STAGING_SECURE_API_ROOT: stagingSecureExpensifyUrl,
@@ -93,7 +102,9 @@ export default {
     },
     IS_IN_PRODUCTION: Platform.OS === 'web' ? process.env.NODE_ENV === 'production' : !__DEV__,
     IS_IN_STAGING: ENVIRONMENT === CONST.ENVIRONMENT.STAGING,
-    IS_USING_LOCAL_WEB: useNgrok || expensifyURLRoot.includes('dev'),
+    get IS_USING_LOCAL_WEB() {
+        return useNgrok || getExpensifyURLRoot().includes('dev');
+    },
     PUSHER: {
         APP_KEY: get(Config, 'PUSHER_APP_KEY', '268df511a204fbb60884'),
         SUFFIX: ENVIRONMENT === CONST.ENVIRONMENT.DEV ? get(Config, 'PUSHER_DEV_SUFFIX', '') : '',
@@ -109,7 +120,9 @@ export default {
     DEV_PORT: process.env.PORT ?? 8082,
     E2E_TESTING: get(Config, 'E2E_TESTING', 'false') === 'true',
     SEND_CRASH_REPORTS: get(Config, 'SEND_CRASH_REPORTS', 'false') === 'true',
-    IS_USING_WEB_PROXY: getPlatform() === 'web' && useWebProxy,
+    get IS_USING_WEB_PROXY() {
+        return getIsUsingWebProxy();
+    },
     APPLE_SIGN_IN: {
         SERVICE_ID: 'com.chat.expensify.chat.AppleSignIn',
         REDIRECT_URI: `${newExpensifyURL}appleauth`,
@@ -142,4 +155,6 @@ export default {
     IS_TEST_ENV: process.env.NODE_ENV === 'test',
     // eslint-disable-next-line no-restricted-properties
     IS_HYBRID_APP: HybridAppModule.isHybridApp(),
-} as const;
+};
+
+export default CONFIG;
