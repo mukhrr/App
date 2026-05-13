@@ -4539,6 +4539,7 @@ ${amount} voor ${merchant} - ${date}`,
             notConfigured: 'Niet geconfigureerd',
             bankAccountDescription: 'Kies vanaf waar cheques worden verzonden.',
             creditCardAccount: 'Creditcardrekening',
+            travelInvoicingDescription: 'Reiskosten worden als creditcardkosten geëxporteerd naar het hieronder opgegeven QuickBooks Online-account.',
             companyCardsLocationEnabledDescription:
                 'QuickBooks Online ondersteunt geen locaties bij het exporteren van leveranciersfacturen. Omdat je locaties hebt ingeschakeld in je workspace, is deze exportoptie niet beschikbaar.',
             outOfPocketTaxEnabledDescription:
@@ -9184,6 +9185,8 @@ Hier is een *proefbon* om je te laten zien hoe het werkt:`,
                 addMember: 'Kan dit lid niet toevoegen. Probeer het opnieuw.',
                 vacationDelegate: 'Kan deze gebruiker niet als vakantiemandataris instellen. Probeer het opnieuw.',
                 moveMember: 'Kan dit lid niet verplaatsen. Probeer het opnieuw.',
+                moveMemberNotPolicyAdmin:
+                    'Kan het lid niet naar de domeingroep verplaatsen. U moet Beleidsbeheerder zijn voor het Voorkeursbeleid dat is ingesteld op de domeingroep waarnaar u deze gebruiker probeert te verplaatsen.',
             },
             cannotSetVacationDelegateForMember: (email: string) =>
                 `Je kunt geen vakantiemandataris instellen voor ${email} omdat die persoon momenteel gedelegeerde is voor de volgende leden:`,
@@ -9238,8 +9241,7 @@ Hier is een *proefbon* om je te laten zien hoe het werkt:`,
             noWorkspacesMessage: 'Er zijn geen werkruimtes op dit domein. Een werkruimte is vereist om deze beperking in te schakelen.',
             restrictDefaultLoginSelection: 'Standaard login-selectie beperken',
             restrictDefaultLoginSelectionDescription: 'Voorkomt dat leden hun login-e-mail wijzigen naar een adres buiten het bedrijfsdomein om beleidsbeperkingen te omzeilen.',
-            expensifyCardPreferredWorkspaceDisabledMessage:
-                'Om deze instelling te gebruiken, moet de voorkeurswerkruimte zijn ingeschakeld en moet voor het domein een Expensify Card zijn ingesteld.',
+            expensifyCardPreferredWorkspaceDisabledMessage: 'Om deze instelling in te schakelen, schakelt u eerst een voorkeurswerkruimte in en stelt u Expensify Cards in op uw domein.',
             findGroup: 'Groep zoeken',
         },
     },

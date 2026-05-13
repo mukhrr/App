@@ -4572,6 +4572,7 @@ ${amount} pour ${merchant} - ${date}`,
             notConfigured: 'Non configuré',
             bankAccountDescription: 'Choisissez d’où envoyer les chèques.',
             creditCardAccount: 'Compte de carte de crédit',
+            travelInvoicingDescription: 'Les frais de voyage seront exportés comme des débits de carte de crédit vers le compte QuickBooks Online indiqué ci-dessous.',
             companyCardsLocationEnabledDescription:
                 'QuickBooks Online ne prend pas en charge les emplacements pour l’exportation des factures fournisseur. Comme vous avez activé les emplacements sur votre espace de travail, cette option d’exportation n’est pas disponible.',
             outOfPocketTaxEnabledDescription:
@@ -9246,6 +9247,8 @@ Voici un *reçu test* pour vous montrer comment ça fonctionne :`,
                 addMember: 'Impossible d’ajouter ce membre. Veuillez réessayer.',
                 vacationDelegate: 'Impossible de définir cet utilisateur comme délégué de vacances. Veuillez réessayer.',
                 moveMember: 'Impossible de déplacer ce membre. Veuillez réessayer.',
+                moveMemberNotPolicyAdmin:
+                    'Impossible de déplacer le membre vers le groupe de domaine. Vous devez être Administrateur de Politique pour la Politique Préférée définie sur le groupe de domaine vers lequel vous essayez de déplacer cet utilisateur.',
             },
             cannotSetVacationDelegateForMember: (email: string) =>
                 `Vous ne pouvez pas définir un délégué de vacances pour ${email}, car cette personne est actuellement le délégué des membres suivants :`,
@@ -9281,7 +9284,7 @@ Voici un *reçu test* pour vous montrer comment ça fonctionne :`,
             permissions: 'Autorisations du groupe',
             createNewGroupButton: 'Nouveau groupe',
             createGroupSubmitButton: 'Créer le groupe',
-            expensifyCardPreferredWorkspace: "Espace de travail préféré pour l'Expensify Card",
+            expensifyCardPreferredWorkspace: 'Espace de travail préféré pour la carte Expensify',
             expensifyCardPreferredWorkspaceDescription:
                 "Toutes les transactions Expensify Card seront créées dans l'espace de travail préféré Expensify Card au lieu de l'espace de travail préféré.",
             strictlyEnforceWorkspaceRules: 'Appliquer strictement les règles de l’espace de travail',
@@ -9303,8 +9306,9 @@ Voici un *reçu test* pour vous montrer comment ça fonctionne :`,
             restrictDefaultLoginSelection: 'Restreindre la sélection de connexion par défaut',
             restrictDefaultLoginSelectionDescription:
                 'Empêche les membres de modifier leur e-mail de connexion en dehors du domaine de leur entreprise afin d’éviter les restrictions de politique.',
+
             expensifyCardPreferredWorkspaceDisabledMessage:
-                'Pour utiliser ce paramètre, l’espace de travail préféré doit être activé et la Expensify Card doit être configurée pour le domaine.',
+                'Pour activer ce paramètre, veuillez d’abord activer un espace de travail préféré et configurer les cartes Expensify sur votre domaine.',
             findGroup: 'Trouver un groupe',
         },
     },
