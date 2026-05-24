@@ -50,6 +50,18 @@ function useTimeSensitiveSignerInfo() {
         return items;
     }, [reportActions]);
 
+    // TODO TEMP: remove before commit — hardcoded for local Home tab visual test
+    return {
+        pendingSignerRequests: [
+            {
+                key: 'signer-test-1234',
+                bankAccountID: '1',
+                bankAccountLastFour: '1234',
+                policyID: 'TESTPOLICY',
+            },
+        ],
+    };
+
     return {pendingSignerRequests};
 }
 
