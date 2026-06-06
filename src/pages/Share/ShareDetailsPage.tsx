@@ -115,6 +115,35 @@ function ShareDetailsPage({route}: ShareDetailsPageProps) {
     }
 
     const isDraft = isDraftReport(reportOrAccountID);
+    const getShareOpenReportParticipants = () => {
+        if (unknownUserDetails?.login) {
+            return [{login: unknownUserDetails.login}];
+        }
+
+        return (
+            displayReport.participantsList
+                ?.filter((participant) => participant.accountID !== personalDetail.accountID)
+                .map((participant) => ({
+                    login: participant.login ?? '',
+                    accountID: participant.accountID,
+                })) ?? []
+        );
+    };
+
+    const openShareDraftReport = () => {
+        if (!isDraft) {
+            return;
+        }
+
+        openReport({
+            reportID: report.reportID,
+            introSelected,
+            participants: getShareOpenReportParticipants(),
+            personalDetails,
+            newReportObject: report,
+            betas,
+        });
+    };
 
     const handleShare = () => {
         if (!currentAttachment || (shouldUsePreValidatedFile && !validatedFile)) {
@@ -122,6 +151,7 @@ function ShareDetailsPage({route}: ShareDetailsPageProps) {
         }
 
         if (isTextShared) {
+            openShareDraftReport();
             addComment({
                 report,
                 notifyReportID: report.reportID,
@@ -140,22 +170,7 @@ function ShareDetailsPage({route}: ShareDetailsPageProps) {
             fileSource,
             validateFileName,
             (file) => {
-                if (isDraft) {
-                    openReport({
-                        reportID: report.reportID,
-                        introSelected,
-                        participants:
-                            displayReport.participantsList
-                                ?.filter((u) => u.accountID !== personalDetail.accountID)
-                                .map((u) => ({
-                                    login: u.login ?? '',
-                                    accountID: u.accountID,
-                                })) ?? [],
-                        personalDetails,
-                        newReportObject: report,
-                        betas,
-                    });
-                }
+                openShareDraftReport();
                 if (report.reportID) {
                     addAttachmentWithComment({
                         report,
