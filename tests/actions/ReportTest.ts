@@ -8392,6 +8392,55 @@ describe('actions/Report', () => {
             expect(result?.parentReportID).toBe(parentReport.reportID);
         });
 
+        it('should seed a known but uncached transaction thread under its existing reportID', async () => {
+            const KNOWN_THREAD_REPORT_ID = '987654321';
+            const parentReport: OnyxTypes.Report = {
+                ...createRandomReport(150, undefined),
+                reportID: '150',
+                policyID: 'policy-150',
+                type: CONST.REPORT.TYPE.EXPENSE,
+            };
+
+            await Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${parentReport.reportID}`, parentReport);
+            await waitForBatchedUpdates();
+
+            const reportAction: OnyxTypes.ReportAction = {
+                ...createRandomReportAction(2),
+                reportActionID: 'action-150',
+                actionName: CONST.REPORT.ACTIONS.TYPE.IOU,
+            };
+
+            const result = Report.createTransactionThreadReport({
+                introSelected: TEST_INTRO_SELECTED,
+                currentUserLogin: TEST_USER_LOGIN,
+                currentUserAccountID: TEST_USER_ACCOUNT_ID,
+                betas: undefined,
+                iouReport: parentReport,
+                iouReportAction: reportAction,
+                knownTransactionThreadReportID: KNOWN_THREAD_REPORT_ID,
+            });
+            await waitForBatchedUpdates();
+
+            // The thread must be created under the server's ID, not a freshly generated one, so the review flow lands
+            // on a report it actually has, carrying the fields every duplicate-review page reads off the thread.
+            expect(result?.reportID).toBe(KNOWN_THREAD_REPORT_ID);
+            expect(result?.parentReportID).toBe(parentReport.reportID);
+            expect(result?.parentReportActionID).toBe(reportAction.reportActionID);
+            expect(result?.policyID).toBe(parentReport.policyID);
+
+            const seededThread = await new Promise<OnyxEntry<OnyxTypes.Report>>((resolve) => {
+                const connection = Onyx.connect({
+                    key: `${ONYXKEYS.COLLECTION.REPORT}${KNOWN_THREAD_REPORT_ID}`,
+                    callback: (value) => {
+                        Onyx.disconnect(connection);
+                        resolve(value);
+                    },
+                });
+            });
+            expect(seededThread?.parentReportID).toBe(parentReport.reportID);
+            expect(seededThread?.parentReportActionID).toBe(reportAction.reportActionID);
+        });
+
         it('should accept introSelected as first parameter and not bypass it', async () => {
             const parentReport: OnyxTypes.Report = {
                 ...createRandomReport(200, undefined),

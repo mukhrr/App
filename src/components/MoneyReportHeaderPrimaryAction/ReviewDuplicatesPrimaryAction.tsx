@@ -10,6 +10,7 @@ import {getThreadReportIDsForTransactions} from '@libs/MoneyRequestReportUtils';
 import createDynamicRoute from '@libs/Navigation/helpers/dynamicRoutesUtils/createDynamicRoute';
 import Navigation from '@libs/Navigation/Navigation';
 import {getIOUActionForReportID} from '@libs/ReportActionsUtils';
+import {getReportOrDraftReport} from '@libs/ReportUtils';
 import {isDuplicate} from '@libs/TransactionUtils';
 
 import {createTransactionThreadReport} from '@userActions/Report';
@@ -29,7 +30,7 @@ function ReviewDuplicatesPrimaryAction({reportID, chatReportID}: SimpleActionPro
     const {translate} = useLocalize();
     const {accountID, email} = useCurrentUserPersonalDetails();
 
-    const {moneyRequestReport, reportActions, transactionThreadReportID} = useTransactionThreadData(reportID, chatReportID);
+    const {moneyRequestReport, reportActions, transactionThreadReportID, isOffline} = useTransactionThreadData(reportID, chatReportID);
     const [policy] = useOnyx(`${ONYXKEYS.COLLECTION.POLICY}${getNonEmptyStringOnyxID(moneyRequestReport?.policyID)}`);
     const [introSelected] = useOnyx(ONYXKEYS.NVP_INTRO_SELECTED);
     const [betas] = useOnyx(ONYXKEYS.BETAS);
@@ -58,7 +59,10 @@ function ReviewDuplicatesPrimaryAction({reportID, chatReportID}: SimpleActionPro
                     );
                     if (duplicateTransaction) {
                         const existingThreadID = getThreadReportIDsForTransactions(reportActions, [duplicateTransaction]).at(0);
-                        if (existingThreadID) {
+                        // Offline the thread report can never be fetched, so seed it locally under its known ID. Without this
+                        // the review flow lands on a report it has no copy of and every page reading the thread shows "Not here".
+                        const shouldSeedUncachedThread = !!existingThreadID && isOffline && !getReportOrDraftReport(existingThreadID)?.reportID;
+                        if (existingThreadID && !shouldSeedUncachedThread) {
                             threadID = existingThreadID;
                         } else {
                             const transactionID = duplicateTransaction.transactionID;
@@ -70,8 +74,9 @@ function ReviewDuplicatesPrimaryAction({reportID, chatReportID}: SimpleActionPro
                                 betas,
                                 iouReport: moneyRequestReport,
                                 iouReportAction: iouAction,
+                                knownTransactionThreadReportID: existingThreadID,
                             });
-                            threadID = createdTransactionThreadReport?.reportID;
+                            threadID = createdTransactionThreadReport?.reportID ?? existingThreadID;
                         }
                     }
                 }

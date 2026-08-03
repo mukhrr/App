@@ -2279,6 +2279,10 @@ type CreateTransactionThreadReportParams = {
     /** Whether the user has completed the guided setup flow */
     // TODO: This will be required eventually. Refactor issue: https://github.com/Expensify/App/issues/66424
     hasCompletedGuidedSetupFlow?: boolean;
+
+    /** The reportID of a transaction thread that already exists on the server but is not in Onyx yet. When set, the
+     * optimistic thread is built under that ID so it merges with the server copy instead of creating a second thread. */
+    knownTransactionThreadReportID?: string;
 };
 
 function createTransactionThreadReport(params: CreateTransactionThreadReportParams): OptimisticChatReport | undefined {
@@ -2294,6 +2298,7 @@ function createTransactionThreadReport(params: CreateTransactionThreadReportPara
         personalDetails,
         isSelfTourViewed,
         hasCompletedGuidedSetupFlow,
+        knownTransactionThreadReportID,
     } = params;
 
     // Determine if we need selfDM report (for track expenses or unreported transactions)
@@ -2330,7 +2335,7 @@ function createTransactionThreadReport(params: CreateTransactionThreadReportPara
         }
     }
 
-    const optimisticTransactionThreadReportID = generateReportID();
+    const optimisticTransactionThreadReportID = knownTransactionThreadReportID ?? generateReportID();
     const optimisticTransactionThread = buildTransactionThread(iouReportAction, reportToUse, currentUserAccountID, undefined, optimisticTransactionThreadReportID);
     const shouldAddPendingFields = transaction?.pendingAction === CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD || iouReportAction?.pendingAction === CONST.RED_BRICK_ROAD_PENDING_ACTION.ADD;
     const participantAccountIDsForDetails = [currentUserAccountID];
