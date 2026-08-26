@@ -351,6 +351,12 @@ type OpenReportActionParams = {
     /** Whether or not this report is being opened from a deep link */
     isFromDeepLink?: boolean;
 
+    /**
+     * Fetch outside the SequentialQueue. A queued OpenReport waits for the whole app sync to send AND holds its
+     * response data until the queue drains, which on a cold deep link keeps the report behind OpenApp twice over.
+     */
+    shouldFetchImmediately?: boolean;
+
     /** Whether this is a new thread being created */
     isNewThread?: boolean;
 
@@ -1669,6 +1675,7 @@ function openReport(params: OpenReportActionParams) {
         newReportObject,
         parentReportActionID,
         isFromDeepLink = false,
+        shouldFetchImmediately = false,
         personalDetails,
         isNewThread = false,
         transaction,
@@ -2094,6 +2101,15 @@ function openReport(params: OpenReportActionParams) {
         });
 
         API.paginate(CONST.API_REQUEST_TYPE.WRITE, WRITE_COMMANDS.OPEN_REPORT, parameters, {optimisticData, successData, failureData, finallyData}, paginationConfig);
+    } else if (shouldFetchImmediately) {
+        // eslint-disable-next-line rulesdir/no-multiple-api-calls, @typescript-eslint/no-unsafe-type-assertion
+        API.paginate(
+            CONST.API_REQUEST_TYPE.MAKE_REQUEST_WITH_SIDE_EFFECTS as typeof CONST.API_REQUEST_TYPE.WRITE,
+            WRITE_COMMANDS.OPEN_REPORT,
+            parameters,
+            {optimisticData, successData, failureData, finallyData},
+            paginationConfig,
+        );
     } else {
         // eslint-disable-next-line rulesdir/no-multiple-api-calls
         API.paginate(CONST.API_REQUEST_TYPE.WRITE, WRITE_COMMANDS.OPEN_REPORT, parameters, {optimisticData, successData, failureData, finallyData}, paginationConfig, {

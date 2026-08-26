@@ -209,7 +209,10 @@ function MoneyRequestReportView({report, reportIDFromRoute, reportLoadingState, 
     }, [reportID]);
 
     const shouldShowEmptyActionsSkeleton = reportActions.length === 0;
-    const shouldShowAppLoadSkeleton = !!report && isAppLoadPending;
+    // On a deep link the report's own data can land long before OpenApp finishes, and holding a skeleton over it
+    // until the whole app sync completes is what makes the report look like it never loads. Once this report's
+    // transactions are here there is nothing left to wait for, so render it.
+    const shouldShowAppLoadSkeleton = !!report && isAppLoadPending && visibleTransactions.length === 0;
     // These skeletons render before the report lands in Onyx, so the mark uses the route id.
     useMarkOpenReportEndOnSkeleton(reportIDFromRoute, shouldShowOpenReportLoadingSkeleton || shouldShowEmptyActionsSkeleton || shouldShowAppLoadSkeleton);
 

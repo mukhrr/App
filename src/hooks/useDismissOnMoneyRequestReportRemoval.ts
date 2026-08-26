@@ -10,6 +10,9 @@ import {useEffect, useRef} from 'react';
 import useOnyx from './useOnyx';
 import usePrevious from './usePrevious';
 
+/** How long a money request report must stay absent before its disappearance counts as a removal. */
+const CONFIRM_REMOVAL_DELAY_MS = 2000;
+
 /**
  * Dismisses the modal when a money request report is removed (e.g. deleted or merged).
  * Skips dismissal during route changes — the new report's data may not be loaded yet,
@@ -38,7 +41,11 @@ function useDismissOnMoneyRequestReportRemoval(reportIDFromRoute: string | undef
             if (!isFocused) {
                 return;
             }
-            Navigation.dismissModal();
+            // A boot snapshot can replace the report collection and make the report vanish for a moment, which is
+            // not a removal. Confirm it stays gone before dismissing: if it comes back this effect re-runs and
+            // clears the timeout, so a cold deep link is no longer bounced back to Home.
+            const timeoutID = setTimeout(() => Navigation.dismissModal(), CONFIRM_REMOVAL_DELAY_MS);
+            return () => clearTimeout(timeoutID);
         }
     }, [report, isFocused, prevReport, prevReportIDFromRoute, reportIDFromRoute]);
 }

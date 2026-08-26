@@ -10,6 +10,7 @@ import WideRHPOverlayWrapper from '@components/WideRHPOverlayWrapper';
 import useCurrentUserPersonalDetails from '@hooks/useCurrentUserPersonalDetails';
 import useDismissOnMoneyRequestReportRemoval from '@hooks/useDismissOnMoneyRequestReportRemoval';
 import useDocumentTitle from '@hooks/useDocumentTitle';
+import {useIsAppLoadPending, useIsReportLoadPending} from '@hooks/useInFlightRequests';
 import useIsReportReadyToDisplay from '@hooks/useIsReportReadyToDisplay';
 import useNetwork from '@hooks/useNetwork';
 import useOnyx from '@hooks/useOnyx';
@@ -25,7 +26,7 @@ import useTransactionThreadReportID from '@hooks/useTransactionThreadReportID';
 
 import getNonEmptyStringOnyxID from '@libs/getNonEmptyStringOnyxID';
 import Log from '@libs/Log';
-import {getAllNonDeletedTransactions} from '@libs/MoneyRequestReportUtils';
+import {getAllNonDeletedTransactions, shouldWaitForTransactions} from '@libs/MoneyRequestReportUtils';
 import type {PlatformStackScreenProps} from '@libs/Navigation/PlatformStackNavigation/types';
 import TransitionTracker from '@libs/Navigation/TransitionTracker';
 import type {RightModalNavigatorParamList} from '@libs/Navigation/types';
@@ -76,6 +77,16 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
     const [report] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT}${reportIDFromRoute}`);
     const [hasReportActions] = useOnyx(`${ONYXKEYS.COLLECTION.REPORT_ACTIONS}${reportIDFromRoute}`, {selector: Boolean});
     const [deleteTransactionNavigateBackUrl] = useOnyx(ONYXKEYS.NVP_DELETE_TRANSACTION_NAVIGATE_BACK_URL);
+    const prevReportIDFromRoute = usePrevious(reportIDFromRoute);
+    // The report is briefly absent from Onyx while OpenApp's setcollection replaces the report collection.
+    // Latch that it was loaded so that gap is not mistaken for "no access" and flashed as the NotFound page.
+    const hasLoadedReportOnceRef = useRef(false);
+    if (prevReportIDFromRoute !== reportIDFromRoute) {
+        hasLoadedReportOnceRef.current = false;
+    }
+    if (report?.reportID) {
+        hasLoadedReportOnceRef.current = true;
+    }
 
     const parentReportAction = useParentReportAction(report);
 
@@ -145,7 +156,7 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
     const doesReportIDLookValid = isValidReportIDFromPath(reportID);
     const hasLoadedReportActionsForAccessError = hasLoadedReportActions(reportLoadingState, isOffline);
     const isReportPendingDeletion = isMoneyRequestReportPendingDeletion(report);
-    const isThreadReportDeletedForReview = isThreadReportDeleted(report, reportLoadingState, isOffline);
+    const isThreadReportDeletedForReview = !hasLoadedReportOnceRef.current && isThreadReportDeleted(report, reportLoadingState, isOffline);
     const {wasParentActionDeleted} = getParentReportActionDeletionStatus({
         parentReportID: report?.parentReportID,
         parentReportActionID: report?.parentReportActionID,
@@ -187,7 +198,6 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
 
     // Tracks initial mount to ensure openReport is called once for multi-transaction reports
     const isInitialMountRef = useRef(true);
-    const prevReportIDFromRoute = usePrevious(reportIDFromRoute);
 
     useEffect(() => {
         // Reset flag when reportID changes (screen stays mounted but navigates to different report)
@@ -215,7 +225,9 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
             return;
         }
 
-        openReport({reportID: reportIDFromRoute, introSelected, conciergeChat, betas, hasReportActions, currentUserAccountID});
+        // The first fetch on a cold deep link must not queue behind the app sync, or the report stays a skeleton
+        // for as long as OpenApp takes to send, return and apply.
+        openReport({reportID: reportIDFromRoute, introSelected, conciergeChat, betas, hasReportActions, currentUserAccountID, shouldFetchImmediately: isInitialMountRef.current});
         isInitialMountRef.current = false;
 
         // oneTransactionID dependency handles the case when deleting a transaction:
@@ -234,6 +246,37 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
             cancelSpansByPrefix(CONST.TELEMETRY.SPAN_SEND_MESSAGE);
         };
     }, [reportIDFromRoute]);
+
+    const isAppLoadPending = useIsAppLoadPending();
+    const isReportLoadPending = useIsReportLoadPending(reportIDFromRoute);
+    const wasInitialLoadPendingRef = useRef(false);
+    const hasVerifiedReportDataRef = useRef(false);
+
+    // The openReport above races the initial OpenApp on a cold deep link, and OpenApp's snapshot can replace
+    // transactions_ without this report's transactions. Once both settle, re-check with the skeleton's own
+    // predicate and re-fetch once if the data went missing, so the skeleton can't latch forever.
+    useEffect(() => {
+        if (isAppLoadPending || isReportLoadPending) {
+            wasInitialLoadPendingRef.current = true;
+            return;
+        }
+        if (!wasInitialLoadPendingRef.current || hasVerifiedReportDataRef.current) {
+            return;
+        }
+        const hasReport = !!report?.reportID;
+        // The report never loaded, so its absence is a lack of access rather than a drop. Nothing to recover.
+        if (!hasReport && !hasLoadedReportOnceRef.current) {
+            return;
+        }
+        // OpenApp's setcollection can drop the report itself as well as its transactions, and both need the refetch.
+        const needsRecovery = !hasReport || shouldWaitForTransactions(report, reportTransactions, reportLoadingState, isReportLoadPending, isOffline);
+        hasVerifiedReportDataRef.current = true;
+        if (!needsRecovery) {
+            return;
+        }
+        openReport({reportID: reportIDFromRoute, introSelected, betas, hasReportActions, currentUserAccountID});
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isAppLoadPending, isReportLoadPending, report?.reportID]);
 
     // Create transaction thread for legacy transactions that don't have one yet.
     // Wait for all data to load to avoid duplicates or stale data when navigating between reports.
@@ -338,7 +381,7 @@ function SearchMoneyRequestReportPage({route}: SearchMoneyRequestPageProps) {
             return true;
         }
 
-        return !reportID && hasLoadedReportActionsForAccessError && !hasAnyTransactions;
+        return !reportID && !hasLoadedReportOnceRef.current && hasLoadedReportActionsForAccessError && !hasAnyTransactions;
 
         // isLoadingApp intentionally omitted to avoid re-computing after initial load completes.
         // eslint-disable-next-line react-hooks/exhaustive-deps
