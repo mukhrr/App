@@ -1,56 +1,38 @@
-import {useMemoizedLazyExpensifyIcons} from '@hooks/useLazyAsset';
-import useLocalize from '@hooks/useLocalize';
-import useTheme from '@hooks/useTheme';
 import useThemeStyles from '@hooks/useThemeStyles';
 
-import variables from '@styles/variables';
-
-import CONST from '@src/CONST';
-
-import React from 'react';
+import {useFocusEffect} from '@react-navigation/native';
+import React, {useContext, useEffect, useRef} from 'react';
 import {View} from 'react-native';
 
-import Icon from './Icon';
-import {PressableWithoutFeedback} from './Pressable';
-import Text from './Text';
+import type {OnboardingStickyHeaderConfig} from './OnboardingStickyHeader';
 
-type OnboardingHeaderProps = {
-    onBackButtonPress?: () => void;
+import {OnboardingStickyHeaderActionsContext} from './OnboardingStickyHeader';
 
-    shouldShowBackButton?: boolean;
-};
+type OnboardingHeaderProps = OnboardingStickyHeaderConfig;
 
 /**
- * Popover-style back link: caret + "Back" label.
- * Matches the submenu back row used by PopoverMenu.
+ * Registers the focused step's back caret with OnboardingStickyHeader and reserves the caret's height inside the
+ * step's own ScreenWrapper. The caret itself is drawn once above the navigator so it does not slide with the card.
  */
-function OnboardingHeader({onBackButtonPress, shouldShowBackButton = true}: OnboardingHeaderProps) {
+function OnboardingHeader({onBackButtonPress, shouldShowBackButton = true, shouldCollapseOnKeyboard = false}: OnboardingHeaderProps) {
     const styles = useThemeStyles();
-    const {translate} = useLocalize();
-    const theme = useTheme();
-    const icons = useMemoizedLazyExpensifyIcons(['BackArrow']);
+    const setStickyHeaderConfig = useContext(OnboardingStickyHeaderActionsContext);
 
-    return (
-        <View style={[styles.onboardingHeaderContainer]}>
-            {shouldShowBackButton ? (
-                <PressableWithoutFeedback
-                    onPress={onBackButtonPress}
-                    style={[styles.flexRow, styles.alignItemsCenter, styles.gap3]}
-                    role={CONST.ROLE.BUTTON}
-                    accessibilityLabel={translate('common.back')}
-                    sentryLabel="OnboardingHeader-Back"
-                >
-                    <Icon
-                        src={icons.BackArrow}
-                        fill={theme.icon}
-                        width={variables.iconSizeNormal}
-                        height={variables.iconSizeNormal}
-                    />
-                    <Text style={styles.createMenuHeaderText}>{translate('common.back')}</Text>
-                </PressableWithoutFeedback>
-            ) : null}
-        </View>
-    );
+    // Steps pass a fresh inline handler on every render, so the sticky header gets a stable callback that reads the latest one.
+    const onBackButtonPressRef = useRef(onBackButtonPress);
+    useEffect(() => {
+        onBackButtonPressRef.current = onBackButtonPress;
+    }, [onBackButtonPress]);
+
+    useFocusEffect(() => {
+        setStickyHeaderConfig({
+            shouldShowBackButton,
+            shouldCollapseOnKeyboard,
+            onBackButtonPress: () => onBackButtonPressRef.current?.(),
+        });
+    });
+
+    return <View style={styles.onboardingHeaderContainer} />;
 }
 
 export default OnboardingHeader;

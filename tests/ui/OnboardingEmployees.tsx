@@ -2,6 +2,7 @@ import {act, render, screen, waitFor} from '@testing-library/react-native';
 
 import ComposeProviders from '@components/ComposeProviders';
 import {LocaleContextProvider} from '@components/LocaleContextProvider';
+import OnboardingStickyHeader from '@components/OnboardingStickyHeader';
 import OnyxListItemProvider from '@components/OnyxListItemProvider';
 
 import {CurrentReportIDContextProvider} from '@hooks/useCurrentReportID';
@@ -47,13 +48,15 @@ const renderOnboardingEmployeesPage = (initialRouteName: typeof SCREENS.ONBOARDI
         <ComposeProviders components={[OnyxListItemProvider, LocaleContextProvider, CurrentReportIDContextProvider]}>
             <PortalProvider>
                 <NavigationContainer>
-                    <Stack.Navigator initialRouteName={initialRouteName}>
-                        <Stack.Screen
-                            name={SCREENS.ONBOARDING.EMPLOYEES}
-                            component={OnboardingEmployees}
-                            initialParams={initialParams}
-                        />
-                    </Stack.Navigator>
+                    <OnboardingStickyHeader>
+                        <Stack.Navigator initialRouteName={initialRouteName}>
+                            <Stack.Screen
+                                name={SCREENS.ONBOARDING.EMPLOYEES}
+                                component={OnboardingEmployees}
+                                initialParams={initialParams}
+                            />
+                        </Stack.Navigator>
+                    </OnboardingStickyHeader>
                 </NavigationContainer>
             </PortalProvider>
         </ComposeProviders>,

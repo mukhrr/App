@@ -1,5 +1,6 @@
 import NoDropZone from '@components/DragAndDrop/NoDropZone';
 import FocusTrapForScreens from '@components/FocusTrap/FocusTrapForScreen';
+import OnboardingStickyHeader from '@components/OnboardingStickyHeader';
 
 import useKeyboardShortcut from '@hooks/useKeyboardShortcut';
 import useOnyx from '@hooks/useOnyx';
@@ -121,53 +122,55 @@ function OnboardingModalNavigator() {
             >
                 <FocusTrapForScreens>
                     <OnboardingModalNavigatorContentWrapper onboardingIsMediumOrLargerScreenWidth={onboardingIsMediumOrLargerScreenWidth}>
-                        <Stack.Navigator
-                            screenOptions={defaultScreenOptions}
-                            initialRouteName={initialRouteName}
-                        >
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.PURPOSE}
-                                component={OnboardingPurpose}
-                                options={{animationTypeForReplace: 'push'}}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.PERSONAL_DETAILS}
-                                component={OnboardingPersonalDetails}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.WORK_EMAIL}
-                                component={OnboardingWorkEmail}
-                                options={{animationTypeForReplace: 'push'}}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.WORK_EMAIL_VALIDATION}
-                                component={OnboardingWorkEmailValidation}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.PRIVATE_DOMAIN}
-                                component={OnboardingPrivateDomain}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.WORKSPACES}
-                                component={OnboardingWorkspaces}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.EMPLOYEES}
-                                component={OnboardingEmployees}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.ACCOUNTING}
-                                component={OnboardingAccounting}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.INTERESTED_FEATURES}
-                                component={OnboardingInterestedFeatures}
-                            />
-                            <Stack.Screen
-                                name={SCREENS.ONBOARDING.PERSONAL_TRACK_GOAL}
-                                component={OnboardingPersonalTrackGoal}
-                            />
-                        </Stack.Navigator>
+                        <OnboardingStickyHeader>
+                            <Stack.Navigator
+                                screenOptions={defaultScreenOptions}
+                                initialRouteName={initialRouteName}
+                            >
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.PURPOSE}
+                                    component={OnboardingPurpose}
+                                    options={{animationTypeForReplace: 'push'}}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.PERSONAL_DETAILS}
+                                    component={OnboardingPersonalDetails}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.WORK_EMAIL}
+                                    component={OnboardingWorkEmail}
+                                    options={{animationTypeForReplace: 'push'}}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.WORK_EMAIL_VALIDATION}
+                                    component={OnboardingWorkEmailValidation}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.PRIVATE_DOMAIN}
+                                    component={OnboardingPrivateDomain}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.WORKSPACES}
+                                    component={OnboardingWorkspaces}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.EMPLOYEES}
+                                    component={OnboardingEmployees}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.ACCOUNTING}
+                                    component={OnboardingAccounting}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.INTERESTED_FEATURES}
+                                    component={OnboardingInterestedFeatures}
+                                />
+                                <Stack.Screen
+                                    name={SCREENS.ONBOARDING.PERSONAL_TRACK_GOAL}
+                                    component={OnboardingPersonalTrackGoal}
+                                />
+                            </Stack.Navigator>
+                        </OnboardingStickyHeader>
                     </OnboardingModalNavigatorContentWrapper>
                 </FocusTrapForScreens>
             </View>

@@ -10,6 +10,9 @@ type CollapsibleHeaderOnKeyboardProps = {
      * regardless if there is enough space for the input above the keyboard.
      */
     alwaysCollapseHeaderOnKeyboard?: boolean;
+
+    /** When false the children render as-is, without the collapsing wrapper */
+    enabled?: boolean;
 };
 
 // eslint-disable-next-line import/prefer-default-export

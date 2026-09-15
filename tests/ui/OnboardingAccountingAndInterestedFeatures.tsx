@@ -1,7 +1,8 @@
-import {act, fireEvent, render, screen, waitFor} from '@testing-library/react-native';
+import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react-native';
 
 import ComposeProviders from '@components/ComposeProviders';
 import {LocaleContextProvider} from '@components/LocaleContextProvider';
+import OnboardingStickyHeader from '@components/OnboardingStickyHeader';
 import OnyxListItemProvider from '@components/OnyxListItemProvider';
 import ScreenWrapper from '@components/ScreenWrapper';
 import TextInput from '@components/TextInput';
@@ -76,16 +77,18 @@ function renderAccountingPage() {
     return render(
         <ComposeProviders components={[OnyxListItemProvider, LocaleContextProvider, CurrentReportIDContextProvider]}>
             <NavigationContainer>
-                <Stack.Navigator initialRouteName={SCREENS.ONBOARDING.ACCOUNTING}>
-                    <Stack.Screen name={SCREENS.ONBOARDING.ACCOUNTING}>
-                        {(props) => (
-                            <BaseOnboardingAccounting
-                                {...props}
-                                shouldUseNativeStyles={false}
-                            />
-                        )}
-                    </Stack.Screen>
-                </Stack.Navigator>
+                <OnboardingStickyHeader>
+                    <Stack.Navigator initialRouteName={SCREENS.ONBOARDING.ACCOUNTING}>
+                        <Stack.Screen name={SCREENS.ONBOARDING.ACCOUNTING}>
+                            {(props) => (
+                                <BaseOnboardingAccounting
+                                    {...props}
+                                    shouldUseNativeStyles={false}
+                                />
+                            )}
+                        </Stack.Screen>
+                    </Stack.Navigator>
+                </OnboardingStickyHeader>
             </NavigationContainer>
         </ComposeProviders>,
     );
@@ -240,5 +243,15 @@ describe('Onboarding interested features and accounting pages', () => {
         fireEvent.press(screen.getByLabelText(TestHelper.translateLocal('common.back')));
 
         expect(goBack).toHaveBeenCalledWith(ROUTES.ONBOARDING_INTERESTED_FEATURES.getRoute());
+    });
+
+    it('draws the back caret outside the animated step card', async () => {
+        renderAccountingPage();
+
+        await waitForBatchedUpdatesWithAct();
+        const backLabel = TestHelper.translateLocal('common.back');
+
+        expect(screen.getByLabelText(backLabel)).toBeTruthy();
+        expect(within(screen.getByTestId('BaseOnboardingAccounting')).queryByLabelText(backLabel)).toBeNull();
     });
 });
