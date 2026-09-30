@@ -11,31 +11,42 @@ import type {SubPageProps} from '@hooks/useSubPage/types';
 import useThemeStyles from '@hooks/useThemeStyles';
 
 import {addPersonalBankAccount, clearPersonalBankAccount} from '@libs/actions/BankAccounts';
+import {setDraftValues} from '@libs/actions/FormActions';
 import {continueSetup} from '@libs/actions/PaymentMethods';
 import {updateCurrentStep} from '@libs/actions/Wallet';
 
 import Navigation from '@navigation/Navigation';
 
+import {getWalletOwnerDetails, hasWalletOwnerAddress, hasWalletOwnerName, hasWalletOwnerPhone} from '@pages/EnablePayments/Wallet/utils/getWalletOwnerDetails';
 import useIsBankAccountAdded from '@pages/EnablePayments/Wallet/utils/useIsBankAccountAdded';
 
 import CONST from '@src/CONST';
 import type {EnablePaymentsSubPageType} from '@src/CONST';
 import ONYXKEYS from '@src/ONYXKEYS';
 import ROUTES from '@src/ROUTES';
+import WALLET_INPUT_IDS from '@src/types/form/WalletAdditionalDetailsForm';
 
 import React, {useCallback, useContext} from 'react';
 import {View} from 'react-native';
 
 import SetupMethod from './SetupMethod';
+import Address from './substeps/AddressStep';
 import Confirmation from './substeps/ConfirmationStep';
+import LegalName from './substeps/LegalNameStep';
+import PhoneNumber from './substeps/PhoneNumberStep';
 import Plaid from './substeps/PlaidStep';
 
 const ADD_BANK_ACCOUNT_SUB_PAGES = CONST.ENABLE_PAYMENTS.ADD_BANK_ACCOUNT_STEP.SUB_PAGE_NAMES;
 
 const plaidPages = [
     {pageName: ADD_BANK_ACCOUNT_SUB_PAGES.PLAID, component: Plaid},
+    {pageName: ADD_BANK_ACCOUNT_SUB_PAGES.LEGAL_NAME, component: LegalName},
+    {pageName: ADD_BANK_ACCOUNT_SUB_PAGES.ADDRESS, component: Address},
+    {pageName: ADD_BANK_ACCOUNT_SUB_PAGES.PHONE_NUMBER, component: PhoneNumber},
     {pageName: ADD_BANK_ACCOUNT_SUB_PAGES.CONFIRMATION, component: Confirmation},
 ];
+
+const WALLET_PERSONAL_INFO_KEYS = WALLET_INPUT_IDS.PERSONAL_INFO_STEP;
 
 const confirmationPageIndex = plaidPages.findIndex((page) => page.pageName === ADD_BANK_ACCOUNT_SUB_PAGES.CONFIRMATION);
 
@@ -44,6 +55,7 @@ function AddBankAccount() {
     const [personalBankAccount] = useOnyx(ONYXKEYS.PERSONAL_BANK_ACCOUNT);
     const [personalBankAccountDraft] = useOnyx(ONYXKEYS.FORMS.PERSONAL_BANK_ACCOUNT_FORM_DRAFT);
     const [personalPolicyID] = useOnyx(ONYXKEYS.PERSONAL_POLICY_ID);
+    const [privatePersonalDetails] = useOnyx(ONYXKEYS.PRIVATE_PERSONAL_DETAILS);
     const {translate} = useLocalize();
     const styles = useThemeStyles();
     const kycWallRef = useContext(KYCWallContext);
@@ -68,14 +80,34 @@ function AddBankAccount() {
                       ...selectedPlaidBankAccount,
                       plaidAccessToken: plaidData?.plaidAccessToken ?? '',
                   };
-            addPersonalBankAccount(bankAccountWithToken, personalPolicyID);
+            const ownerDetails = getWalletOwnerDetails(privatePersonalDetails, personalBankAccountDraft);
+            addPersonalBankAccount({...bankAccountWithToken, ...ownerDetails, country: CONST.COUNTRY.US}, personalPolicyID);
+
+            // The wallet KYC step that follows asks for the same details, so hand them over instead of asking twice.
+            setDraftValues(ONYXKEYS.FORMS.WALLET_ADDITIONAL_DETAILS, {
+                [WALLET_PERSONAL_INFO_KEYS.FIRST_NAME]: ownerDetails.legalFirstName,
+                [WALLET_PERSONAL_INFO_KEYS.LAST_NAME]: ownerDetails.legalLastName,
+                [WALLET_PERSONAL_INFO_KEYS.STREET]: ownerDetails.addressStreet,
+                [WALLET_PERSONAL_INFO_KEYS.CITY]: ownerDetails.addressCity,
+                [WALLET_PERSONAL_INFO_KEYS.STATE]: ownerDetails.addressState,
+                [WALLET_PERSONAL_INFO_KEYS.ZIP_CODE]: ownerDetails.addressZipCode,
+                [WALLET_PERSONAL_INFO_KEYS.PHONE_NUMBER]: ownerDetails.phoneNumber,
+            });
         }
-    }, [isBankAccountAlreadyAdded, personalBankAccountDraft?.plaidAccountID, plaidData?.bankAccounts, plaidData?.plaidAccessToken, personalPolicyID]);
+    }, [isBankAccountAlreadyAdded, personalBankAccountDraft, plaidData?.bankAccounts, plaidData?.plaidAccessToken, personalPolicyID, privatePersonalDetails]);
+
+    const savedOwnerDetails = getWalletOwnerDetails(privatePersonalDetails);
+    const skipPages = [
+        ...(hasWalletOwnerName(savedOwnerDetails) ? [ADD_BANK_ACCOUNT_SUB_PAGES.LEGAL_NAME] : []),
+        ...(hasWalletOwnerAddress(savedOwnerDetails) ? [ADD_BANK_ACCOUNT_SUB_PAGES.ADDRESS] : []),
+        ...(hasWalletOwnerPhone(savedOwnerDetails) ? [ADD_BANK_ACCOUNT_SUB_PAGES.PHONE_NUMBER] : []),
+    ];
 
     const isSetupTypeChosen = personalBankAccountDraft?.setupType === CONST.BANK_ACCOUNT.SETUP_TYPE.PLAID;
 
     const {CurrentPage, isEditing, pageIndex, nextPage, prevPage, moveTo, isRedirecting} = useSubPage<SubPageProps, EnablePaymentsSubPageType>({
         pages: plaidPages,
+        skipPages,
         // Once the bank account is added there is nothing to redo on the Plaid sub-page, so a revisit shows only the confirmation.
         startFrom: isBankAccountAlreadyAdded ? confirmationPageIndex : 0,
         onFinished: submit,

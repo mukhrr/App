@@ -4072,6 +4072,9 @@ const CONST = {
         ADD_BANK_ACCOUNT_STEP: {
             SUB_PAGE_NAMES: {
                 PLAID: 'plaid',
+                LEGAL_NAME: 'legal-name',
+                ADDRESS: 'address',
+                PHONE_NUMBER: 'phone-number',
                 CONFIRMATION: 'confirmation',
             },
         },
@@ -4144,6 +4147,9 @@ const CONST = {
         SUBSTEP_INDEXES: {
             BANK_ACCOUNT: {
                 ACCOUNT_NUMBERS: 0,
+                LEGAL_NAME: 1,
+                ADDRESS: 2,
+                PHONE_NUMBER: 3,
             },
             PERSONAL_INFO: {
                 LEGAL_NAME: 0,

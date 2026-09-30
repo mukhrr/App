@@ -59,9 +59,21 @@ function PersonalInfoPage() {
 
     const startFrom = useMemo(() => getInitialSubstepForPersonalInfo(values), [values]);
 
+    // Date of birth sits between the name and the address pages, so starting past the name is not enough to keep filled pages from showing again.
+    const hasLegalName = !!values[PERSONAL_INFO_STEP_KEYS.FIRST_NAME] && !!values[PERSONAL_INFO_STEP_KEYS.LAST_NAME];
+    const hasAddress =
+        !!values[PERSONAL_INFO_STEP_KEYS.STREET] && !!values[PERSONAL_INFO_STEP_KEYS.CITY] && !!values[PERSONAL_INFO_STEP_KEYS.STATE] && !!values[PERSONAL_INFO_STEP_KEYS.ZIP_CODE];
+    const hasPhoneNumber = !!values[PERSONAL_INFO_STEP_KEYS.PHONE_NUMBER];
+    const skipPages = [
+        ...(hasLegalName ? [PERSONAL_INFO_SUB_PAGES.LEGAL_NAME] : []),
+        ...(hasAddress ? [PERSONAL_INFO_SUB_PAGES.ADDRESS] : []),
+        ...(hasPhoneNumber ? [PERSONAL_INFO_SUB_PAGES.PHONE_NUMBER] : []),
+    ];
+
     const {CurrentPage, isEditing, pageIndex, nextPage, prevPage, moveTo, isRedirecting} = useSubPage<SubPageProps, EnablePaymentsSubPageType>({
         pages: formPages,
         startFrom,
+        skipPages,
         onFinished: submit,
         buildRoute: (pageName, action) =>
             ROUTES.SETTINGS_ENABLE_PAYMENTS.getRoute({
