@@ -167,6 +167,20 @@ function rescaleSnapshotGroupAmount<T extends OnyxTypes.Transaction>(transaction
     };
 }
 
+function isSplitOnEditableReport(
+    transactionID: string | undefined,
+    fallbackReportID: string | undefined,
+    allTransactionsList: OnyxCollection<OnyxTypes.Transaction>,
+    allReportsList: OnyxCollection<OnyxTypes.Report>,
+    searchReportsData: SearchResultDataType | undefined,
+): boolean {
+    const transactionKey = `${ONYXKEYS.COLLECTION.TRANSACTION}${transactionID}` as const;
+    const liveReportID = allTransactionsList?.[transactionKey]?.reportID ?? searchReportsData?.[transactionKey]?.reportID ?? fallbackReportID;
+    const reportKey = `${ONYXKEYS.COLLECTION.REPORT}${liveReportID}` as const;
+    const statusNum = allReportsList?.[reportKey]?.statusNum ?? searchReportsData?.[reportKey]?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN;
+    return statusNum < CONST.REPORT.STATUS_NUM.SUBMITTED;
+}
+
 /**
  * Whether any of the given splits still lives on a report that hasn't been submitted yet.
  */
@@ -176,13 +190,20 @@ function hasEditableSplitExpenseLeft(
     allReportsList: OnyxCollection<OnyxTypes.Report>,
     searchReportsData: SearchResultDataType | undefined,
 ): boolean {
-    return splitExpenses.some((expense) => {
-        const transactionKey = `${ONYXKEYS.COLLECTION.TRANSACTION}${expense.transactionID}` as const;
-        const liveReportID = allTransactionsList?.[transactionKey]?.reportID ?? searchReportsData?.[transactionKey]?.reportID ?? expense.reportID;
-        const reportKey = `${ONYXKEYS.COLLECTION.REPORT}${liveReportID}` as const;
-        const statusNum = allReportsList?.[reportKey]?.statusNum ?? searchReportsData?.[reportKey]?.statusNum ?? CONST.REPORT.STATUS_NUM.OPEN;
-        return statusNum < CONST.REPORT.STATUS_NUM.SUBMITTED;
-    });
+    return splitExpenses.some((expense) => isSplitOnEditableReport(expense.transactionID, expense.reportID, allTransactionsList, allReportsList, searchReportsData));
+}
+
+/**
+ * The server refuses to revert a split while any of its children sits on a submitted report, even when the kept one
+ * doesn't (e.g. it was rejected onto a new open report), so every existing child has to be editable.
+ */
+function canRevertSplit(
+    childTransactions: Array<OnyxEntry<OnyxTypes.Transaction>>,
+    allTransactionsList: OnyxCollection<OnyxTypes.Transaction>,
+    allReportsList: OnyxCollection<OnyxTypes.Report>,
+    searchReportsData: SearchResultDataType | undefined,
+): boolean {
+    return childTransactions.every((child) => isSplitOnEditableReport(child?.transactionID, child?.reportID, allTransactionsList, allReportsList, searchReportsData));
 }
 
 function updateSplitTransactions({
@@ -306,7 +327,11 @@ function updateSplitTransactions({
     const isCreationOfSplits = allChildTransactions.length === 0;
     const currentSnapshotDataForSplits = allSnapshots?.[`${ONYXKEYS.COLLECTION.SNAPSHOT}${searchContext?.currentSearchHash}`]?.data;
     const hasEditableSplitExpensesLeft = hasEditableSplitExpenseLeft(splitExpenses, allTransactionsList, allReportsList, currentSnapshotDataForSplits);
-    const isReverseSplitOperation = splitExpenses.length === 1 && allChildTransactions.length > 0 && hasEditableSplitExpensesLeft;
+    const isReverseSplitOperation =
+        splitExpenses.length === 1 &&
+        allChildTransactions.length > 0 &&
+        hasEditableSplitExpensesLeft &&
+        canRevertSplit(allChildTransactions, allTransactionsList, allReportsList, currentSnapshotDataForSplits);
 
     let splitThreadComments: OnyxTypes.ReportAction[] = [];
     let splitThreadReportAction: OnyxTypes.ReportAction | undefined;
@@ -2038,7 +2063,8 @@ function updateSplitTransactions({
         // The format is: splits[0][amount], splits[0][category], splits[0][tag] etc.
         const splitApiParams = {} as Record<string, string | number | boolean>;
         for (const [i, split] of splits.entries()) {
-            for (const [key, value] of Object.entries(split)) {
+            // The server keeps this param verbatim as the IOU action's comment, so a stringified object ends up in the LHN preview.
+            for (const [key, value] of Object.entries({...split, comment: split.comment?.comment})) {
                 splitApiParams[`splits[${i}][${key}]`] = value !== null && typeof value === 'object' ? JSON.stringify(value) : value;
             }
         }
@@ -2053,5 +2079,5 @@ function updateSplitTransactions({
     TransitionTracker.runAfterTransitions({callback: () => removeDraftSplitTransaction(originalTransactionID), waitForUpcomingTransition: true});
 }
 
-export {hasEditableSplitExpenseLeft, updateSplitTransactions};
+export {canRevertSplit, hasEditableSplitExpenseLeft, updateSplitTransactions};
 export type {UpdateSplitTransactionsParams};

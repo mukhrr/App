@@ -6698,6 +6698,83 @@ describe('updateSplitTransactions', () => {
         expect(updatedReportPreviewAction?.childVisibleActionCount).toEqual(2);
     });
 
+    it('should update instead of revert when the only kept split was rejected onto an open report and its sibling is on a submitted report', async () => {
+        // Given a two-way split on an expense report
+        const {expenseReport, originalTransactionID} = await createBaseExpense();
+
+        if (!originalTransactionID || !expenseReport?.reportID) {
+            throw new Error('Missing original transaction data');
+        }
+
+        const {splitTransactionID1} = await splitToTwo(expenseReport, originalTransactionID, getIOUActionForReportID(expenseReport.reportID, originalTransactionID));
+
+        // And the expense report was submitted, then split 1 was rejected, which moves it onto a new open report but keeps its split metadata
+        const rejectedToReportID = '9876543210';
+        await Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${expenseReport.reportID}`, {stateNum: CONST.REPORT.STATE_NUM.SUBMITTED, statusNum: CONST.REPORT.STATUS_NUM.SUBMITTED});
+        await Onyx.merge(`${ONYXKEYS.COLLECTION.REPORT}${rejectedToReportID}`, {
+            reportID: rejectedToReportID,
+            type: CONST.REPORT.TYPE.EXPENSE,
+            stateNum: CONST.REPORT.STATE_NUM.OPEN,
+            statusNum: CONST.REPORT.STATUS_NUM.OPEN,
+        });
+        await Onyx.merge(`${ONYXKEYS.COLLECTION.TRANSACTION}${splitTransactionID1}`, {reportID: rejectedToReportID});
+        await waitForBatchedUpdates();
+
+        const writeSpy = jest.spyOn(APIlib, 'write');
+        const {allTransactions, allReports, allReportNameValuePairs} = await getCollections();
+        const allPolicyTags = await getAllPolicyTags();
+        const reports = getTransactionAndExpenseReports(expenseReport.reportID);
+
+        // When the user removes the sibling split and saves with only the rejected split left
+        updateSplitTransactions({
+            isVendorMatchingBetaEnabled: false,
+            rules: undefined,
+            getCurrencyDecimals: getCurrencyDecimalsLocal,
+            getCurrencySymbol: getCurrencySymbolLocal,
+            allTransactionsList: allTransactions,
+            allReportsList: allReports,
+            allReportActionsList: undefined,
+            allReportNameValuePairsList: allReportNameValuePairs,
+            transactionData: {
+                reportID: expenseReport.reportID,
+                originalTransactionID,
+                splitExpenses: [{transactionID: splitTransactionID1, reportID: rejectedToReportID, amount, description: 'Rejected split', created: DateUtils.getDBTime()}],
+                splitExpensesTotal: amount,
+            },
+            searchContext: {currentSearchHash: -2},
+            policyCategories: undefined,
+            policy: undefined,
+            policyRecentlyUsedCategories: [],
+            iouReport: expenseReport,
+            firstIOU: undefined,
+            isASAPSubmitBetaEnabled: false,
+            currentUserPersonalDetails,
+            transactionViolations: {},
+            policyRecentlyUsedCurrencies: [],
+            quickAction: undefined,
+            allPolicyTags,
+            personalDetails: {[RORY_ACCOUNT_ID]: {accountID: RORY_ACCOUNT_ID, login: RORY_EMAIL}},
+            transactionReport: reports.transactionReport,
+            expenseReport: reports.expenseReport,
+            isOffline: false,
+            delegateAccountID: undefined,
+            isTrackIntentUser: false,
+            formatPhoneNumber,
+        });
+
+        const commands = writeSpy.mock.calls.map(([command]) => command);
+        const updateSplitTransactionCall = writeSpy.mock.calls.find(([command]) => command === WRITE_COMMANDS.UPDATE_SPLIT_TRANSACTION);
+        writeSpy.mockRestore();
+
+        // Then no revert is sent, because the server refuses to revert a split while one of its children is on a submitted report
+        expect(commands).not.toContain(WRITE_COMMANDS.REVERT_SPLIT_TRANSACTION);
+        expect(updateSplitTransactionCall).toBeDefined();
+
+        // And the description goes out as plain text, since the server stores this param verbatim as the IOU action comment
+        const [, params] = getRequiredWriteCall(updateSplitTransactionCall ? [updateSplitTransactionCall] : [], 0);
+        expect(params['splits[0][comment]']).toBe('Rejected split');
+    });
+
     it('should move remaining split comments and hold state back to the reverted transaction thread and update the preview action in a reverse split', async () => {
         const {expenseReport, chatReport, transactionThreadReportID, originalTransactionID} = await createBaseExpense();
 
