@@ -862,6 +862,28 @@ describe('Session', () => {
             clearSpy.mockRestore();
             writeWithNoDuplicatesSpy.mockRestore();
         });
+
+        test('login-required path keeps the loaded identity and Classic redirect through the clear', async () => {
+            // Given a signed-in user forced to add 2FA, whose 2FA screens stay mounted while the clear and OpenApp run
+            const makeRequestSpy = jest.spyOn(API, 'makeRequestWithSideEffects').mockResolvedValue({
+                authToken: 'newAuthToken',
+                encryptedAuthToken: 'newEncryptedAuthToken',
+            });
+            const clearSpy = jest.spyOn(Onyx, 'clear').mockResolvedValue(undefined);
+
+            // When the 2FA validation succeeds
+            SessionUtil.validateTwoFactorAuth('123456', true);
+            await waitForBatchedUpdates();
+
+            // Then the clear keeps what the agent guard and the success page read, so the screens are not unmounted mid-flow
+            expect(clearSpy).toHaveBeenCalled();
+            expect(clearSpy.mock.calls.at(0)?.at(0)).toEqual(
+                expect.arrayContaining([ONYXKEYS.HAS_LOADED_APP, ONYXKEYS.PERSONAL_DETAILS_LIST, ONYXKEYS.NVP_TRY_NEW_DOT, ONYXKEYS.PRIVATE_PERSONAL_DETAILS]),
+            );
+
+            makeRequestSpy.mockRestore();
+            clearSpy.mockRestore();
+        });
     });
 
     describe('clearTwoFactorAuthSecretKey', () => {
