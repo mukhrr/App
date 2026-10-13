@@ -1507,6 +1507,9 @@ function validateTwoFactorAuth(twoFactorAuthCode: string, shouldClearData: boole
             return;
         }
 
+        // Same account, so the 2FA screens keep their identity and the Classic redirect through the reset
+        const keysToPreserveAfter2FA = [...KEYS_TO_PRESERVE, ONYXKEYS.NVP_TRY_NEW_DOT, ONYXKEYS.HAS_LOADED_APP, ONYXKEYS.PERSONAL_DETAILS_LIST];
+
         // Forced onboarding 2FA: swap to the post-validate auth token immediately so Got it → openApp()
         // cannot race the async reconnect, then clear stale pre-2FA Onyx while deferring openApp() until
         // DynamicSuccessPage Got it so the 2FA RHP stays open through verify → success.
@@ -1514,7 +1517,7 @@ function validateTwoFactorAuth(twoFactorAuthCode: string, shouldClearData: boole
         // (including work-email form state for account-merge validation after dismiss).
         if (options.shouldKeepTwoFactorAuthFlowOpen) {
             const keysToPreserveForForcedOnboarding2FA = [
-                ...KEYS_TO_PRESERVE,
+                ...keysToPreserveAfter2FA,
                 ONYXKEYS.PRIVATE_PERSONAL_DETAILS,
                 ONYXKEYS.NVP_ONBOARDING,
                 ONYXKEYS.ONBOARDING_LAST_VISITED_PATH,
@@ -1542,7 +1545,7 @@ function validateTwoFactorAuth(twoFactorAuthCode: string, shouldClearData: boole
 
         // Clear onyx data if the user has just signed in and is forced to add 2FA
         if (shouldClearData) {
-            const keysToPreserveWithPrivatePersonalDetails = [...KEYS_TO_PRESERVE, ONYXKEYS.PRIVATE_PERSONAL_DETAILS];
+            const keysToPreserveWithPrivatePersonalDetails = [...keysToPreserveAfter2FA, ONYXKEYS.PRIVATE_PERSONAL_DETAILS];
             clearOnyxAndSeedFullReconnect(keysToPreserveWithPrivatePersonalDetails).then(() => updateAuthTokenAndOpenApp(response.authToken, response.encryptedAuthToken));
             return;
         }
