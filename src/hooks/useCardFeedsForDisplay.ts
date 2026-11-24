@@ -2,7 +2,7 @@ import type {CardFeedForDisplay} from '@libs/CardFeedUtils';
 import {getCardFeedsForDisplayPerPolicy} from '@libs/CardFeedUtils';
 import {getPreferredPolicyFromExpensifyCardSettings, isCustomFeed} from '@libs/CardUtils';
 import type {ExpensifyCardFeedEntry} from '@libs/ExpensifyCardFeedSelectorUtils';
-import {isPaidGroupPolicy} from '@libs/PolicyUtils';
+import {isPaidGroupPolicy, isPolicyEligibleForCardAccruals} from '@libs/PolicyUtils';
 
 import CONST from '@src/CONST';
 import ONYXKEYS from '@src/ONYXKEYS';
@@ -60,6 +60,49 @@ function getDefaultCardFeed(
 }
 
 /**
+ * Collects every card feed that can hold expenses for Card accruals, so the default query doesn't hide unapproved expenses
+ * that sit on a feed other than the default one: the company feeds and the Expensify Card of each workspace eligible for
+ * Card accruals, plus the active workspace's own Expensify Card. The IDs are sorted so every call site builds the same query
+ * hash, which keeps the Card accruals tab highlighted.
+ */
+function getCardAccrualsFeedIDs(
+    policies: OnyxCollection<Policy>,
+    cardFeedsByPolicy: Record<string, CardFeedForDisplay[]>,
+    expensifyCardFeeds: CardFeedForDisplay[] | undefined,
+    activeExpensifyCardFeedID: string | undefined,
+    localeCompare: (a: string, b: string) => number,
+): string[] {
+    const feedIDs = new Set<string>();
+    if (activeExpensifyCardFeedID) {
+        feedIDs.add(activeExpensifyCardFeedID);
+    }
+
+    for (const policy of Object.values(policies ?? {})) {
+        if (!policy?.id || !isPolicyEligibleForCardAccruals(policy)) {
+            continue;
+        }
+
+        for (const feed of cardFeedsByPolicy[policy.id] ?? []) {
+            feedIDs.add(feed.id);
+        }
+
+        // A workspace's own Expensify Card feed is funded by the workspace account. Domain-funded feeds can't be matched to a
+        // workspace this way, so only the active workspace's one is covered, by `activeExpensifyCardFeedID`.
+        if (!policy.policyAccountID) {
+            continue;
+        }
+        const workspaceFundID = String(policy.policyAccountID);
+        for (const feed of expensifyCardFeeds ?? []) {
+            if (feed.fundID === workspaceFundID) {
+                feedIDs.add(feed.id);
+            }
+        }
+    }
+
+    return [...feedIDs].sort(localeCompare);
+}
+
+/**
  * Resolves the active workspace's own Expensify Card feed for Card accruals, returning its display-feed ID (or
  * `undefined` when the workspace isn't eligible or has no Expensify Card).
  *
@@ -82,12 +125,7 @@ function getActiveExpensifyCardFeedID(
 ): string | undefined {
     // Only override the default when the active workspace is itself eligible for Card accruals. Tab visibility is
     // OR-ed across workspaces, so without this gate an ineligible active workspace's card could hijack the feed.
-    const isActivePolicyEligibleForCardAccruals =
-        isPaidGroupPolicy(activePolicy) &&
-        (activePolicy?.role === CONST.POLICY.ROLE.ADMIN || activePolicy?.role === CONST.POLICY.ROLE.AUDITOR || activePolicy?.role === CONST.POLICY.ROLE.CARD_ADMIN) &&
-        (activePolicy?.approvalMode ? activePolicy.approvalMode !== CONST.POLICY.APPROVAL_MODE.OPTIONAL : false);
-
-    if (!isActivePolicyEligibleForCardAccruals) {
+    if (!isPolicyEligibleForCardAccruals(activePolicy)) {
         return undefined;
     }
 
@@ -109,16 +147,15 @@ const useCardFeedsForDisplay = () => {
     const feedKeysWithCards = useFeedKeysWithAssignedCards();
     const [activePolicyID] = useOnyx(ONYXKEYS.NVP_ACTIVE_POLICY_ID);
     const [expensifyCardFeeds] = useOnyx(ONYXKEYS.DERIVED.NON_PERSONAL_AND_WORKSPACE_CARD_LIST, {selector: expensifyCardFeedsForDisplaySelector});
-    const eligiblePoliciesIDsArray = eligiblePoliciesSelector(allPolicies);
-
-    const cardFeedsByPolicy = getCardFeedsForDisplayPerPolicy(allFeeds, translate, feedKeysWithCards, allPolicies);
-
-    const defaultCardFeed = getDefaultCardFeed(eligiblePoliciesIDsArray, activePolicyID, cardFeedsByPolicy, localeCompare);
-
     // Resolve the active workspace's Expensify Card feed so Card accruals lines up with the per-policy feed list
     // built by `getCardFeedsForDisplayPerPolicy`, scoping to the active policy so we don't pull in a feed from
     // another workspace the user also belongs to. See `getActiveExpensifyCardFeedID` for the precedence rule.
     const {primaryFeeds, allFeeds: expensifyCardFeedEntries} = useExpensifyCardFeedsForFeedSelector(activePolicyID);
+
+    const eligiblePoliciesIDsArray = eligiblePoliciesSelector(allPolicies);
+    const cardFeedsByPolicy = getCardFeedsForDisplayPerPolicy(allFeeds, translate, feedKeysWithCards, allPolicies);
+    const defaultCardFeed = getDefaultCardFeed(eligiblePoliciesIDsArray, activePolicyID, cardFeedsByPolicy, localeCompare);
+
     const activePolicy = activePolicyID ? allPolicies?.[`${ONYXKEYS.COLLECTION.POLICY}${activePolicyID}`] : undefined;
     const activePolicyAccountID = activePolicy?.policyAccountID;
     const preferredPolicyFeedFundID = activePolicyID
@@ -126,9 +163,10 @@ const useCardFeedsForDisplay = () => {
         : undefined;
 
     const activeExpensifyCardFeedID = getActiveExpensifyCardFeedID(activePolicy, primaryFeeds, preferredPolicyFeedFundID, activePolicyAccountID, expensifyCardFeeds);
+    const cardAccrualsFeedIDs = getCardAccrualsFeedIDs(allPolicies, cardFeedsByPolicy, expensifyCardFeeds, activeExpensifyCardFeedID, localeCompare);
 
-    return {defaultCardFeed, cardFeedsByPolicy, activeExpensifyCardFeedID};
+    return {defaultCardFeed, cardFeedsByPolicy, cardAccrualsFeedIDs};
 };
 
 export default useCardFeedsForDisplay;
-export {getDefaultCardFeed, getActiveExpensifyCardFeedID};
+export {getDefaultCardFeed, getActiveExpensifyCardFeedID, getCardAccrualsFeedIDs};

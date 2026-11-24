@@ -1,10 +1,13 @@
-import {getActiveExpensifyCardFeedID, getDefaultCardFeed} from '@hooks/useCardFeedsForDisplay';
+import {getActiveExpensifyCardFeedID, getCardAccrualsFeedIDs, getDefaultCardFeed} from '@hooks/useCardFeedsForDisplay';
 
 import type {CardFeedForDisplay} from '@libs/CardFeedUtils';
 import type {ExpensifyCardFeedEntry} from '@libs/ExpensifyCardFeedSelectorUtils';
 
 import CONST from '@src/CONST';
+import ONYXKEYS from '@src/ONYXKEYS';
 import type {ExpensifyCardSettings, Policy} from '@src/types/onyx';
+
+import type {OnyxCollection} from 'react-native-onyx';
 
 import createRandomPolicy from '../utils/collections/policies';
 
@@ -165,5 +168,76 @@ describe('getActiveExpensifyCardFeedID', () => {
         it('returns undefined when there is no active policy', () => {
             expect(getActiveExpensifyCardFeedID(undefined, [], undefined, undefined, [])).toBeUndefined();
         });
+    });
+});
+
+describe('getCardAccrualsFeedIDs', () => {
+    // Paid workspace with approvals where the user is an admin, so it is eligible for Card accruals
+    const createEligiblePolicy = (id: string, policyAccountID: number): Policy => ({
+        ...createRandomPolicy(policyAccountID, CONST.POLICY.TYPE.CORPORATE),
+        id,
+        role: CONST.POLICY.ROLE.ADMIN,
+        approvalMode: CONST.POLICY.APPROVAL_MODE.BASIC,
+        policyAccountID,
+    });
+    const toPolicyCollection = (policies: Policy[]): OnyxCollection<Policy> => Object.fromEntries(policies.map((policy) => [`${ONYXKEYS.COLLECTION.POLICY}${policy.id}`, policy]));
+    const expensifyFeed = (fundID: string): CardFeedForDisplay => ({id: `${fundID}_Expensify Card`, feed: CONST.EXPENSIFY_CARD.BANK, fundID, name: CONST.EXPENSIFY_CARD.BANK});
+
+    it('includes company feeds of other eligible workspaces alongside the active Expensify Card', () => {
+        // Given the case from issue 104831: the active workspace has an Expensify Card, and the unapproved expenses sit on a
+        // company feed of another workspace the user also administers
+        const policies = toPolicyCollection([createEligiblePolicy('POLICY_A', 100), createEligiblePolicy('POLICY_B', 200)]);
+        const cardFeedsByPolicy: Record<string, CardFeedForDisplay[]> = {POLICY_B: [customFeedA]};
+
+        // When the Card accruals feeds are collected
+        const result = getCardAccrualsFeedIDs(policies, cardFeedsByPolicy, [expensifyFeed('100')], '100_Expensify Card', localeCompare);
+
+        // Then both feeds are searched, so the company feed's expenses aren't hidden behind "Nothing to show"
+        expect(result).toEqual(['1_vcf', '100_Expensify Card']);
+    });
+
+    it('includes the Expensify Card of every eligible workspace, not only the active one', () => {
+        // Given two eligible workspaces, each funding its own Expensify Card
+        const policies = toPolicyCollection([createEligiblePolicy('POLICY_A', 100), createEligiblePolicy('POLICY_B', 200)]);
+
+        // When the Card accruals feeds are collected with only the active workspace's card resolved
+        const result = getCardAccrualsFeedIDs(policies, {}, [expensifyFeed('100'), expensifyFeed('200')], '100_Expensify Card', localeCompare);
+
+        // Then the other workspace's card is included too
+        expect(result).toEqual(['100_Expensify Card', '200_Expensify Card']);
+    });
+
+    it('leaves out feeds of workspaces that are not eligible for Card accruals', () => {
+        // Given a workspace where the user is only a member, with its own company feed and Expensify Card
+        const memberPolicy: Policy = {...createEligiblePolicy('POLICY_B', 200), role: CONST.POLICY.ROLE.USER};
+        const policies = toPolicyCollection([createEligiblePolicy('POLICY_A', 100), memberPolicy]);
+        const cardFeedsByPolicy: Record<string, CardFeedForDisplay[]> = {POLICY_A: [customFeedB], POLICY_B: [customFeedA]};
+
+        // When the Card accruals feeds are collected
+        const result = getCardAccrualsFeedIDs(policies, cardFeedsByPolicy, [expensifyFeed('100'), expensifyFeed('200')], undefined, localeCompare);
+
+        // Then only the eligible workspace's feeds are searched, since the user can't review the other workspace's spend
+        expect(result).toEqual(['1_cdf', '100_Expensify Card']);
+    });
+
+    it('returns the same sorted list whatever order the feeds arrive in', () => {
+        // Given the same feeds listed in two different orders
+        const policies = toPolicyCollection([createEligiblePolicy('POLICY_A', 100)]);
+
+        // When the Card accruals feeds are collected from each
+        const first = getCardAccrualsFeedIDs(policies, {POLICY_A: [customFeedB, customFeedA]}, [expensifyFeed('100')], undefined, localeCompare);
+        const second = getCardAccrualsFeedIDs(policies, {POLICY_A: [customFeedA, customFeedB]}, [expensifyFeed('100')], undefined, localeCompare);
+
+        // Then both produce the same list, so every call site builds the same query hash
+        expect(first).toEqual(second);
+    });
+
+    it('returns an empty list when there are no eligible workspaces and no active Expensify Card', () => {
+        // Given no workspaces
+        // When the Card accruals feeds are collected
+        const result = getCardAccrualsFeedIDs(undefined, {}, undefined, undefined, localeCompare);
+
+        // Then nothing is returned and the caller falls back to the default feed
+        expect(result).toEqual([]);
     });
 });

@@ -13271,37 +13271,54 @@ describe('SearchUIUtils', () => {
         const companyFeedID = 'fund1_oauth.chase.com';
         const activeExpensifyCardFeedID = 'fund1_Expensify Card';
 
-        const getCardAccrualsFeedValues = (activeCardFeedID?: string, defaultFeedID?: string): unknown[] => {
-            const suggestedSearches = SearchUIUtils.getSuggestedSearches(adminAccountID, defaultFeedID, undefined, activeCardFeedID);
+        const getCardAccrualsFeedValues = (cardAccrualsFeedIDs?: string[], defaultFeedID?: string): unknown[] => {
+            const suggestedSearches = SearchUIUtils.getSuggestedSearches(adminAccountID, defaultFeedID, undefined, cardAccrualsFeedIDs);
             const cardAccruals = suggestedSearches[CONST.SEARCH.SEARCH_KEYS.UNAPPROVED_CARD];
             const feedFilter = cardAccruals.searchQueryJSON?.flatFilters?.find((filter) => filter.key === CONST.SEARCH.SYNTAX_FILTER_KEYS.FEED);
             return (feedFilter?.filters ?? []).map((f) => f.value).filter(Boolean);
         };
 
-        test('Should default Card accruals to the Expensify Card when the active workspace has one, even alongside a company feed', () => {
-            // Reported case: workspace has both an Expensify Card and a company/bank feed.
-            expect(getCardAccrualsFeedValues(activeExpensifyCardFeedID, companyFeedID)).toEqual([activeExpensifyCardFeedID]);
+        test('Should include both the Expensify Card and the company feed in Card accruals when the workspace has both', () => {
+            // Given a workspace with both an Expensify Card and a company feed, both resolved as Card accruals feeds
+            const cardAccrualsFeedIDs = [activeExpensifyCardFeedID, companyFeedID];
+
+            // When the Card accruals query is built
+            const values = getCardAccrualsFeedValues(cardAccrualsFeedIDs, companyFeedID);
+
+            // Then unapproved expenses on either feed are searched, so none of them are hidden
+            expect(values).toEqual(cardAccrualsFeedIDs);
         });
 
-        test('Should keep the company feed for Card accruals when the active workspace has no Expensify Card', () => {
-            // Also guards the multi-workspace regression: the resolver (useCardFeedsForDisplay) only passes an
-            // Expensify Card feed scoped to the active workspace, so an unrelated workspace's card is undefined here.
-            expect(getCardAccrualsFeedValues(undefined, companyFeedID)).toEqual([companyFeedID]);
+        test('Should fall back to the default feed for Card accruals when no Card accruals feeds are resolved yet', () => {
+            // Given no resolved Card accruals feeds, as while policies are still loading, and a default company feed
+            // When the Card accruals query is built
+            const values = getCardAccrualsFeedValues([], companyFeedID);
+
+            // Then the query still targets the default feed rather than an empty one
+            expect(values).toEqual([companyFeedID]);
         });
 
         test('Should not select any card feed for Card accruals when there are neither Expensify Card nor company feeds', () => {
+            // Given no feeds at all
+            // When the Card accruals query is built
             const values = getCardAccrualsFeedValues(undefined, undefined);
+
+            // Then no feed is selected
             expect(values).not.toContain(activeExpensifyCardFeedID);
             expect(values).not.toContain(companyFeedID);
         });
 
-        test('Should produce the same Card accruals hash for both call sites when they pass the same active Expensify Card feed', () => {
-            // SearchQueryProvider and the type menu must agree so the Card accruals tab highlights as active. The two
-            // real call sites differ in the `defaultFeedID` and `shouldShowExpensifyCard` args, so mirror that here to
-            // prove Card accruals is driven purely by `activeExpensifyCardFeedID` and doesn't split on those inputs.
+        test('Should produce the same Card accruals hash for both call sites when they pass the same Card accruals feeds', () => {
+            // Given the two real call sites (SearchQueryProvider and the type menu), which differ in the `defaultFeedID` and
+            // `shouldShowExpensifyCard` args, so the Card accruals tab only highlights when both build the same query
             const otherCompanyFeedID = 'fund2_oauth.chase.com';
-            const fromProvider = SearchUIUtils.getSuggestedSearches(adminAccountID, companyFeedID, undefined, activeExpensifyCardFeedID);
-            const fromMenu = SearchUIUtils.getSuggestedSearches(adminAccountID, otherCompanyFeedID, true, activeExpensifyCardFeedID);
+            const cardAccrualsFeedIDs = [activeExpensifyCardFeedID, companyFeedID];
+
+            // When each call site builds the suggested searches
+            const fromProvider = SearchUIUtils.getSuggestedSearches(adminAccountID, companyFeedID, undefined, cardAccrualsFeedIDs);
+            const fromMenu = SearchUIUtils.getSuggestedSearches(adminAccountID, otherCompanyFeedID, true, cardAccrualsFeedIDs);
+
+            // Then Card accruals is driven purely by the Card accruals feeds and both hashes match
             expect(fromMenu[CONST.SEARCH.SEARCH_KEYS.UNAPPROVED_CARD].similarSearchHash).toBe(fromProvider[CONST.SEARCH.SEARCH_KEYS.UNAPPROVED_CARD].similarSearchHash);
         });
     });

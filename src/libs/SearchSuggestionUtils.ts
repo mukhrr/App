@@ -151,11 +151,17 @@ function getSuggestedSearches(
     accountID: number = CONST.DEFAULT_NUMBER_ID,
     defaultFeedID?: string,
     shouldShowExpensifyCard?: boolean,
-    activeExpensifyCardFeedID?: string,
+    cardAccrualsFeedIDs?: string[],
 ): Record<SearchKey, SearchTypeMenuItem> {
-    // Card accruals (UNAPPROVED_CARD) defaults to the active workspace's Expensify Card when it has one,
-    // falling back to the company/bank feed otherwise. Other feed-based searches keep using `defaultFeedID`.
-    const unapprovedCardFeedID = activeExpensifyCardFeedID ?? defaultFeedID;
+    // Card accruals (UNAPPROVED_CARD) covers every eligible feed (see `getCardAccrualsFeedIDs`), because unapproved expenses
+    // on any of them must show up. It falls back to `defaultFeedID` while those feeds aren't known yet, and to an empty feed
+    // when there is none. Other feed-based searches keep using `defaultFeedID`.
+    let unapprovedCardFeedIDs = [''];
+    if (cardAccrualsFeedIDs?.length) {
+        unapprovedCardFeedIDs = cardAccrualsFeedIDs;
+    } else if (defaultFeedID) {
+        unapprovedCardFeedIDs = [defaultFeedID];
+    }
     return {
         [CONST.SEARCH.SEARCH_KEYS.EXPENSES]: {
             key: CONST.SEARCH.SEARCH_KEYS.EXPENSES,
@@ -343,7 +349,7 @@ function getSuggestedSearches(
             icon: 'CreditCardHourglass',
             searchQuery: buildQueryStringFromFilterFormValues({
                 type: CONST.SEARCH.DATA_TYPES.EXPENSE,
-                feed: unapprovedCardFeedID ? [unapprovedCardFeedID] : [''],
+                feed: unapprovedCardFeedIDs,
                 groupBy: CONST.SEARCH.GROUP_BY.CARD,
                 status: [CONST.SEARCH.STATUS.EXPENSE.UNREPORTED, CONST.SEARCH.STATUS.EXPENSE.DRAFTS, CONST.SEARCH.STATUS.EXPENSE.OUTSTANDING],
             }),

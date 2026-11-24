@@ -161,6 +161,7 @@ import {
     getPolicyRole,
     isPolicyAdmin,
     isPolicyApprover,
+    isPolicyEligibleForCardAccruals,
     isPolicyPayer,
     isPreferredExporter,
     isSubmitPolicy,
@@ -907,7 +908,7 @@ function getSuggestedSearchesVisibility(
         const isEligibleForExportSuggestion = isExporter && !!getValidConnectedIntegration(policy);
         const isEligibleForStatementsSuggestion = isPaidPolicy && (hasCardFeed || !!defaultExpensifyCard);
         const isEligibleForUnapprovedCashSuggestion = isPaidPolicy && (isAdmin || isAuditor || isPaymentsAdmin) && isApprovalEnabled && isPaymentEnabled;
-        const isEligibleForUnapprovedCardSuggestion = isPaidPolicy && (isAdmin || isAuditor || isCardAdmin) && isApprovalEnabled && (hasCardFeed || !!defaultExpensifyCard);
+        const isEligibleForUnapprovedCardSuggestion = isPolicyEligibleForCardAccruals(policy) && (hasCardFeed || !!defaultExpensifyCard);
         const isEligibleForExpensifyCardSuggestion = isPaidPolicy && (isAdmin || isAuditor || isCardAdmin) && isECardEnabled;
         const isEligibleForReimbursementsSuggestion = isPaidPolicy && (isAdmin || isAuditor || isPaymentsAdmin) && isPaymentEnabled && hasVBBA && hasReimburser;
         const memberCount = Object.keys(policy.employeeList ?? {}).length;
@@ -5505,7 +5506,7 @@ type TypeMenuSectionsParams = {
     savedSearches: OnyxEntry<OnyxTypes.SaveSearch>;
     isOffline: boolean;
     defaultExpensifyCard: CardFeedForDisplay | undefined;
-    activeExpensifyCardFeedID?: string;
+    cardAccrualsFeedIDs?: string[];
     draftTransactionIDs: string[] | undefined;
     isTrackIntentUser: boolean;
     hasReportAwaitingApproval?: boolean;
@@ -5523,7 +5524,7 @@ function createTypeMenuSections(params: TypeMenuSectionsParams): SearchTypeMenuS
         savedSearches,
         isOffline,
         defaultExpensifyCard,
-        activeExpensifyCardFeedID,
+        cardAccrualsFeedIDs,
         draftTransactionIDs,
         isTrackIntentUser,
         hasReportAwaitingApproval = false,
@@ -5537,7 +5538,7 @@ function createTypeMenuSections(params: TypeMenuSectionsParams): SearchTypeMenuS
         hasEligibleGroupPolicies,
         shouldShowExpensifyCard,
     } = getSuggestedSearchesVisibility(currentUserEmail, cardFeedsByPolicy, policies, defaultExpensifyCard, hasReportAwaitingApproval, isTrackIntentUser, policyCategories);
-    const suggestedSearches = getSuggestedSearches(currentUserAccountID, defaultCardFeed?.id, shouldShowExpensifyCard, activeExpensifyCardFeedID);
+    const suggestedSearches = getSuggestedSearches(currentUserAccountID, defaultCardFeed?.id, shouldShowExpensifyCard, cardAccrualsFeedIDs);
     const hasAnyPolicyWithWorkflowsEnabled = Object.values(policies ?? {}).some((policy) => policy?.areWorkflowsEnabled);
     const isTrackIntentWithWorkflowsDisabled = isTrackIntentUser && !hasAnyPolicyWithWorkflowsEnabled;
 

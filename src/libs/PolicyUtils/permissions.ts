@@ -8,7 +8,7 @@ import type {OnyxInputOrEntry, Policy} from '@src/types/onyx';
 import type {OnyxEntry} from 'react-native-onyx';
 import type {TupleToUnion, ValueOf} from 'type-fest';
 
-import {isArchivedPolicy, isControlPolicy, isGroupPolicy, isSubmitPolicy} from './policyType';
+import {isArchivedPolicy, isControlPolicy, isGroupPolicy, isPaidGroupPolicy, isSubmitPolicy} from './policyType';
 
 type PolicyFeature = ValueOf<typeof CONST.POLICY.POLICY_FEATURE>;
 type PolicyFeatureAccess = ValueOf<typeof CONST.POLICY.POLICY_FEATURE_ACCESS>;
@@ -404,6 +404,18 @@ function canEditWorkspaceSettings(policy: OnyxInputOrEntry<Policy>, login?: stri
     return isPolicyAdmin(policy, login) || (isSubmitPolicy(policy) && isPolicyEditor(policy, login));
 }
 
+/**
+ * Whether the user can see Card accruals for this workspace: a paid workspace with approvals turned on, where the user is an
+ * admin, auditor or card admin. The Card accruals tab's visibility and the feeds in its default query both use it, so they agree.
+ */
+function isPolicyEligibleForCardAccruals(policy: OnyxInputOrEntry<Policy>): boolean {
+    return (
+        isPaidGroupPolicy(policy) &&
+        (policy?.role === CONST.POLICY.ROLE.ADMIN || policy?.role === CONST.POLICY.ROLE.AUDITOR || policy?.role === CONST.POLICY.ROLE.CARD_ADMIN) &&
+        (policy?.approvalMode ? policy.approvalMode !== CONST.POLICY.APPROVAL_MODE.OPTIONAL : false)
+    );
+}
+
 export {
     isPolicyAdmin,
     isPolicyOwner,
@@ -433,6 +445,7 @@ export {
     isAdminOfCardEnabledPolicy,
     isPolicyEmployee,
     canEditWorkspaceSettings,
+    isPolicyEligibleForCardAccruals,
 };
 
 export type {PolicyFeature, PolicyFeatureAccess};
